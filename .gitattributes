@@ -1,0 +1,6 @@
+# Скрипты, которые выполняются внутри Linux-контейнеров, должны иметь
+# переводы строк LF, иначе на Windows они сломаются после git clone.
+* text=auto
+*.sh text eol=lf
+*.sql text eol=lf
+Dockerfile text eol=lf
