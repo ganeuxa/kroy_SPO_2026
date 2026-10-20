@@ -76,20 +76,49 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string): Promise<T> {
+// Токен входа (JWT) хранится в localStorage и уходит в заголовке Authorization
+const TOKEN_KEY = "kroy_token";
+
+export function getToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setToken(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* хранилище недоступно (приватный режим) — вход проживёт до перезагрузки */
+  }
+}
+
+async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  const token = getToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, { headers: { Accept: "application/json" } });
+    res = await fetch(`/api${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
   } catch {
     throw new ApiError(0, "Сервер недоступен. Проверьте подключение.");
   }
   if (!res.ok) {
     let message = `Ошибка ${res.status}`;
     try {
-      const body = await res.json();
+      const data = await res.json();
       // FastAPI возвращает detail строкой либо списком ошибок валидации
-      if (typeof body.detail === "string") message = body.detail;
-      else if (Array.isArray(body.detail)) message = "Неверные параметры запроса";
+      if (typeof data.detail === "string") message = data.detail;
+      else if (Array.isArray(data.detail)) message = "Проверьте правильность заполнения полей";
     } catch {
       /* тело не JSON — оставляем код ответа */
     }
@@ -113,6 +142,72 @@ export function getProduct(id: number): Promise<ProductDetail> {
 
 export function getFilters(): Promise<Filters> {
   return request<Filters>("/filters");
+}
+
+// --- Вход и регистрация (FR-01, FR-02) ---
+
+export interface User {
+  id: number;
+  email: string;
+  full_name: string;
+  phone: string | null;
+  role: "customer" | "admin";
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+export interface RegisterData {
+  email: string;
+  password: string;
+  full_name: string;
+  phone?: string;
+}
+
+export function register(data: RegisterData): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/register", "POST", data);
+}
+
+export function login(email: string, password: string): Promise<AuthResponse> {
+  return request<AuthResponse>("/auth/login", "POST", { email, password });
+}
+
+export function getMe(): Promise<User> {
+  return request<User>("/auth/me");
+}
+
+// --- Корзина (FR-07) ---
+
+export interface CartItem {
+  id: number;
+  variant_id: number;
+  product_id: number;
+  name: string;
+  size: string;
+  color: string;
+  sku: string;
+  image_key: string | null;
+  price: string;
+  quantity: number;
+  stock: number;
+  line_total: string;
+}
+
+export interface Cart {
+  items: CartItem[];
+  total_quantity: number;
+  total: string;
+}
+
+export function getCart(): Promise<Cart> {
+  return request<Cart>("/cart");
+}
+
+export function addToCart(variantId: number, quantity = 1): Promise<Cart> {
+  return request<Cart>("/cart", "POST", { variant_id: variantId, quantity });
 }
 
 export const GENDER_LABELS: Record<Gender, string> = {
