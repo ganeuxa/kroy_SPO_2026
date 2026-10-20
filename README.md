@@ -3,8 +3,9 @@
 Учебный проект по дисциплине «Создание программного обеспечения», РТУ МИРЭА, группа ЭФБО-07-24.
 
 Сейчас это каркас этапа II (практическая работа №5): сервер, БД и интерфейс каталога.
-Готово: просмотр каталога, фильтры, поиск, карточка товара (FR-03…FR-06).
-Дальше: регистрация, вход и корзина (№6), тестовое окружение с Nginx (№7–8).
+Готово: просмотр каталога, фильтры, поиск, карточка товара (FR-03…FR-06),
+регистрация, вход и добавление в корзину (FR-01, FR-02, FR-07).
+Дальше: тестовое окружение с Nginx (№7–8).
 
 ## Стек
 
@@ -31,11 +32,13 @@ kroy/
 │   ├── db.py              подключение к PostgreSQL
 │   ├── models.py          модели таблиц
 │   ├── schemas.py         форматы ответов API
-│   └── routers/           health.py, products.py
+│   ├── security.py        хэши паролей (bcrypt), JWT, текущий пользователь
+│   └── routers/           health.py, products.py, auth.py, cart.py
 └── frontend/src/
     ├── api.ts             все запросы к серверу
     ├── App.tsx            маршруты и общий шаблон
-    └── pages/             Catalog, Product, Placeholder
+    ├── auth.tsx           кто вошёл: токен в localStorage, проверка через /api/auth/me
+    └── pages/             Catalog, Product, Login, Register, Cart, Placeholder
 ```
 
 ## Запуск
@@ -47,7 +50,9 @@ kroy/
    ```bash
    cp .env.example .env
    ```
-   В `.env` заменить `change-me-owner` и `change-me-app` на свои пароли.
+   В `.env` заменить `change-me-owner` и `change-me-app` на свои пароли,
+   а `change-me-jwt` на длинную случайную строку (ключ подписи токенов входа).
+   Если `.env` создан до №6, добавить в него строку `JWT_SECRET=...`, иначе compose не запустится.
    Если порты 5432, 8000 или 5173 заняты другим проектом, поменять `DB_HOST_PORT`,
    `BACKEND_HOST_PORT`, `FRONTEND_HOST_PORT`.
 3. Запустить:
@@ -91,6 +96,39 @@ docker compose exec db psql -U kroy_owner -d kroy
 | GET | `/api/products` | Каталог с фильтрами и поиском | 200, 422, 503 |
 | GET | `/api/products/{id}` | Карточка товара с вариантами | 200, 404, 422, 503 |
 | GET | `/api/filters` | Категории, размеры, цвета, диапазон цен для фильтров | 200, 503 |
+| POST | `/api/auth/register` | Регистрация, сразу возвращает токен | 201, 409, 422 |
+| POST | `/api/auth/login` | Вход по email и паролю | 200, 401, 403, 422 |
+| GET | `/api/auth/me` | Текущий пользователь по токену | 200, 401 |
+| GET | `/api/cart` | Корзина текущего пользователя | 200, 401 |
+| POST | `/api/cart` | Добавить вариант товара в корзину | 200, 401, 404, 409, 422 |
+
+### Вход и корзина
+
+Регистрация и вход возвращают JWT:
+
+```json
+{"access_token": "eyJ...", "token_type": "bearer", "user": {"id": 2, "email": "anna@example.com", "full_name": "Анна Смирнова", "phone": "+79001112233", "role": "customer"}}
+```
+
+Токен передаётся в заголовке `Authorization: Bearer <токен>` и действует сутки.
+В Swagger: кнопка Authorize, вставить токен. Ключ подписи берётся из `JWT_SECRET` в `.env`.
+
+- Регистрация: `email`, `password` (8–72 символа), `full_name`, необязательный `phone`
+  (`+79001112233`). Email хранится в нижнем регистре, занятый email — 409.
+- Вход: неверный email и неверный пароль дают одно и то же 401 «Неверный email или пароль».
+  Заблокированный пользователь — 403.
+- `POST /api/cart` принимает `{"variant_id": 1, "quantity": 1}` (`quantity` от 1 до 99,
+  по умолчанию 1). Если вариант уже в корзине, количество складывается. Больше остатка
+  на складе положить нельзя: 409 «Недостаточно товара: в наличии N шт.». Нет варианта
+  или товар скрыт — 404. В ответе вся корзина с суммой.
+
+```bash
+curl -X POST http://localhost:8000/api/auth/login -H "Content-Type: application/json" \
+     -d '{"email": "anna@example.com", "password": "KroyTest-2026"}'
+curl http://localhost:8000/api/cart -H "Authorization: Bearer <токен>"
+curl -X POST http://localhost:8000/api/cart -H "Authorization: Bearer <токен>" \
+     -H "Content-Type: application/json" -d '{"variant_id": 1, "quantity": 2}'
+```
 
 Параметры `/api/products`:
 
@@ -118,7 +156,8 @@ curl "http://localhost:8000/api/products?gender=kids"  # 422
 
 ## Тестовые учётные записи
 
-Хэши в `db/02_seed.sql` настоящие, войти можно будет, когда появится вход (№6).
+Хэши в `db/02_seed.sql` настоящие, с ними можно войти через `/api/auth/login`.
+У ilya@example.com в корзине уже два товара.
 
 | Email | Пароль | Роль |
 |---|---|---|
