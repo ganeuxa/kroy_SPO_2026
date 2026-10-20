@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ApiError, GENDER_LABELS, ProductDetail, formatPrice, getProduct } from "../api";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { ApiError, GENDER_LABELS, ProductDetail, addToCart, formatPrice, getProduct } from "../api";
+import { useAuth } from "../auth";
 import ProductImage from "../components/ProductImage";
 
 export default function Product() {
@@ -9,6 +10,11 @@ export default function Product() {
   const [error, setError] = useState<string | null>(null);
   const [color, setColor] = useState<string>("");
   const [size, setSize] = useState<string>("");
+  const [adding, setAdding] = useState(false);
+  const [cartMessage, setCartMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const productId = Number(id);
@@ -38,6 +44,29 @@ export default function Product() {
     [product, color],
   );
   const selected = sizes.find((v) => v.size === size);
+
+  // Сообщение «Добавлено» относится к выбранному варианту, при смене выбора убираем его
+  useEffect(() => setCartMessage(null), [id, color, size]);
+
+  async function onAdd() {
+    if (!selected) return;
+    // Корзина только для вошедших (FR-07): отправляем на вход и возвращаем обратно
+    if (!user) {
+      navigate(`/login?next=${encodeURIComponent(location.pathname)}`);
+      return;
+    }
+    setAdding(true);
+    setCartMessage(null);
+    try {
+      const cart = await addToCart(selected.id);
+      const inCart = cart.items.find((i) => i.variant_id === selected.id)?.quantity ?? 1;
+      setCartMessage({ ok: true, text: `Добавлено, в корзине ${inCart} шт.` });
+    } catch (e) {
+      setCartMessage({ ok: false, text: e instanceof ApiError ? e.message : "Не удалось добавить в корзину" });
+    } finally {
+      setAdding(false);
+    }
+  }
 
   if (error) {
     return (
@@ -110,10 +139,25 @@ export default function Product() {
               : "Выберите размер"}
           </p>
 
-          {/* Добавление в корзину — задача №6 (FR-07), нужен вход */}
-          <button type="button" className="primary" disabled={!selected} title="Появится после входа (№6)">
-            В корзину
+          <button
+            type="button"
+            className="primary"
+            disabled={!selected || !selected.in_stock || adding}
+            onClick={onAdd}
+          >
+            {adding ? "Добавляем…" : "В корзину"}
           </button>
+          {cartMessage && (
+            <p className={cartMessage.ok ? "status" : "status status--error"} role="status">
+              {cartMessage.text}
+              {cartMessage.ok && (
+                <>
+                  {" "}
+                  <Link to="/cart">Перейти в корзину</Link>
+                </>
+              )}
+            </p>
+          )}
         </div>
       </div>
     </article>
