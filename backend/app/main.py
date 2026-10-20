@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import InterfaceError, OperationalError
 
 from app.config import settings
-from app.routers import health, products
+from app.routers import auth, cart, health, products
 
 logging.basicConfig(
     level=settings.log_level,
@@ -23,6 +23,8 @@ app = FastAPI(
 
 app.include_router(health.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
+app.include_router(cart.router, prefix="/api")
 
 
 @app.middleware("http")
