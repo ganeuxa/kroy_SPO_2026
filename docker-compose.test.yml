@@ -1,0 +1,112 @@
+# Тестовое окружение (практические №7–8).
+# Отличия от docker-compose.yml (разработка):
+#   - фронт собран в статику и отдаётся Nginx, Vite dev server не используется;
+#   - наружу открыт один порт Nginx, БД и backend доступны только внутри сетей Docker;
+#   - backend без --reload и без монтирования исходников, код берётся из образа;
+#   - у каждого сервиса healthcheck и политика перезапуска;
+#   - отдельный проект и отдельный том, окружение разработки не затрагивается.
+#
+# Запуск:   docker compose -f docker-compose.test.yml --env-file .env up -d --build
+# Адрес:    http://localhost:8080 (порт меняется через TEST_HTTP_PORT)
+name: kroy-test
+
+x-logging: &default-logging
+  # Ротация логов: не больше 3 файлов по 10 МБ на контейнер
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Задайте POSTGRES_DB в .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Задайте POSTGRES_USER в .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}
+      KROY_APP_PASSWORD: ${DB_PASSWORD:?Задайте DB_PASSWORD в .env}
+    volumes:
+      - pgdata_test:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d:ro
+    # Портов наружу нет: к БД ходит только backend по сети "back"
+    networks: [back]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: *default-logging
+
+  backend:
+    build: ./backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: kroy_app
+      DB_PASSWORD: ${DB_PASSWORD}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в .env}
+    # Без --reload. --proxy-headers: адрес клиента берётся из X-Forwarded-For от Nginx
+    command: >
+      uvicorn app.main:app --host 0.0.0.0 --port 8000
+      --proxy-headers --forwarded-allow-ips=*
+    networks: [front, back]
+    # Портов наружу нет: запросы приходят только через Nginx
+    healthcheck:
+      # В python:slim нет curl, проверяем стандартной библиотекой Python
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *default-logging
+
+  nginx:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      # По умолчанию только с этой машины. Для доступа из локальной сети
+      # задать TEST_BIND_ADDR=0.0.0.0 (HTTPS тогда обязателен по NFR-10)
+      - "${TEST_BIND_ADDR:-127.0.0.1}:${TEST_HTTP_PORT:-8080}:8080"
+    networks: [front]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *default-logging
+
+networks:
+  # Nginx <-> backend
+  front:
+  # backend <-> БД, без выхода в интернет
+  back:
+    internal: true
+
+volumes:
+  pgdata_test:

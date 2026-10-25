@@ -5,7 +5,7 @@
 Сейчас это каркас этапа II (практическая работа №5): сервер, БД и интерфейс каталога.
 Готово: просмотр каталога, фильтры, поиск, карточка товара (FR-03…FR-06),
 регистрация, вход и добавление в корзину (FR-01, FR-02, FR-07).
-Дальше: тестовое окружение с Nginx (№7–8).
+Есть тестовое окружение: Nginx, собранный фронт, healthcheck и автоперезапуск (№7–8).
 
 ## Стек
 
@@ -21,6 +21,7 @@
 ```
 kroy/
 ├── docker-compose.yml   окружение разработки: db, backend, frontend
+├── docker-compose.test.yml  тестовое окружение: db, backend, nginx со сборкой фронта
 ├── .env.example         шаблон переменных окружения (без настоящих паролей)
 ├── db/                  выполняется при первом запуске БД, по порядку:
 │   ├── 01_schema.sql      таблицы, ограничения, индексы
@@ -34,7 +35,10 @@ kroy/
 │   ├── schemas.py         форматы ответов API
 │   ├── security.py        хэши паролей (bcrypt), JWT, текущий пользователь
 │   └── routers/           health.py, products.py, auth.py, cart.py
-└── frontend/src/
+└── frontend/
+    ├── Dockerfile.prod    сборка фронта и образ Nginx для тестового окружения
+    ├── nginx/             конфигурация Nginx: статика, прокси /api, заголовки
+    └── src/
     ├── api.ts             все запросы к серверу
     ├── App.tsx            маршруты и общий шаблон
     ├── auth.tsx           кто вошёл: токен в localStorage, проверка через /api/auth/me
@@ -87,6 +91,48 @@ docker compose exec db psql -U kroy_owner -d kroy
 
 Или из DBeaver/pgAdmin: `localhost`, порт из `DB_HOST_PORT`, БД `kroy`.
 Пользователь `kroy_app` — права как у приложения, `kroy_owner` — владелец схемы.
+
+## Тестовое окружение (№7–8)
+
+Отдельный compose-файл, который запускает приложение так, как оно будет работать на стенде:
+фронт собран в статику и отдаётся Nginx, запросы `/api/` Nginx передаёт в FastAPI.
+Окружение разработки при этом не затрагивается: другое имя проекта (`kroy-test`) и свой том БД.
+
+```
+браузер ──► :8080 Nginx ──(сеть front)──► backend:8000 ──(сеть back, internal)──► db:5432
+            статика React                 FastAPI                                PostgreSQL
+```
+
+| | Разработка (`docker-compose.yml`) | Тест (`docker-compose.test.yml`) |
+|---|---|---|
+| Фронт | Vite dev server, горячая перезагрузка | `npm run build`, раздаёт Nginx |
+| Backend | `--reload`, исходники смонтированы | код внутри образа, без `--reload` |
+| Порты наружу | 5173, 8000, 5432 (на 127.0.0.1) | только 8080 (Nginx) |
+| Healthcheck | только БД | БД, backend, Nginx |
+| Перезапуск | `unless-stopped` у БД и backend | `unless-stopped` у всех |
+| Права | | backend и Nginx не от root, ФС только для чтения, `cap_drop: ALL` |
+
+Запуск (нужен тот же `.env`, что и для разработки):
+
+```bash
+docker compose -f docker-compose.test.yml up -d --build
+docker compose -f docker-compose.test.yml ps          # все три сервиса (healthy)
+```
+
+Открыть http://localhost:8080. Swagger: http://localhost:8080/api/docs.
+Порт меняется переменной `TEST_HTTP_PORT` в `.env`.
+
+Полезные команды:
+
+```bash
+docker compose -f docker-compose.test.yml logs -f backend nginx   # логи
+docker compose -f docker-compose.test.yml restart backend         # перезапуск сервиса
+docker compose -f docker-compose.test.yml down                    # остановить, данные сохраняются
+docker compose -f docker-compose.test.yml down -v                 # остановить и удалить БД
+```
+
+Если backend недоступен, Nginx отвечает на `/api/...` кодом 503 и JSON
+`{"detail": "Сервер временно недоступен, попробуйте позже"}`, интерфейс показывает это сообщение.
 
 ## API
 
