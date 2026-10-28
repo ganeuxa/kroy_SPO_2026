@@ -260,3 +260,7 @@ curl "http://localhost:8000/api/products?gender=kids"  # 422
 - Ветки: `feature/<задача>`, коммиты с префиксом `feat:`, `fix:`, `docs:`, `refactor:`.
 - `.env` и пароли в репозиторий не коммитим.
 - Решения записываем в `docs/decisions.md`.
+
+## Автоматические проверки
+
+Команды запуска pytest и Playwright на отдельных QA-стендах: [tests/README.md](tests/README.md).
