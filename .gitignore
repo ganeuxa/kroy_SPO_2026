@@ -17,3 +17,8 @@ dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Локальное тестирование
+.env.qa
+.pytest_cache/
+qa-results/
