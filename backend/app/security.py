@@ -21,8 +21,13 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, password_hash: str) -> bool:
+    raw = password.encode()
+    if len(raw) > 72:
+        # bcrypt молча обрезает до 72 байт, и «пароль+x» совпал бы с исходным.
+        # Такие пароли при регистрации не принимаются, значит и подойти не могут
+        return False
     try:
-        return bcrypt.checkpw(password.encode(), password_hash.encode())
+        return bcrypt.checkpw(raw, password_hash.encode())
     except ValueError:
         # Хэш в БД испорчен или не bcrypt: считаем, что пароль не подошёл
         return False
