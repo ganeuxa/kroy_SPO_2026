@@ -20,21 +20,26 @@
 
 ```
 kroy/
-├── docker-compose.yml   окружение разработки: db, backend, frontend
-├── docker-compose.test.yml  тестовое окружение: db, backend, nginx со сборкой фронта
+├── docker-compose.yml   окружение разработки: db, migrate, storage, backend, frontend
+├── docker-compose.test.yml  тестовое окружение: db, migrate, storage, backend, nginx со сборкой фронта
 ├── .env.example         шаблон переменных окружения (без настоящих паролей)
 ├── db/                  выполняется при первом запуске БД, по порядку:
 │   ├── 01_schema.sql      таблицы, ограничения, индексы
 │   ├── 02_seed.sql        тестовые данные
-│   └── 03_app_role.sh     роль kroy_app с ограниченными правами
+│   ├── 03_app_role.sh     роль kroy_app с ограниченными правами
+│   └── migrations/        изменения схемы после этапа II: V002__stage3.sql и следующие
+├── storage/start.sh     запуск хранилища фото (SeaweedFS, S3 API) с ключами из .env
 ├── backend/app/
 │   ├── main.py            приложение, логирование, обработка ошибок
 │   ├── config.py          настройки из переменных окружения
 │   ├── db.py              подключение к PostgreSQL
 │   ├── models.py          модели таблиц
 │   ├── schemas.py         форматы ответов API
-│   ├── security.py        хэши паролей (bcrypt), JWT, текущий пользователь
-│   └── routers/           health.py, products.py, auth.py, cart.py
+│   ├── security.py        хэши паролей (bcrypt), JWT, текущий пользователь, require_admin
+│   ├── migrate.py         раннер миграций из db/migrations (сервис migrate)
+│   ├── order_service.py   общая логика заказов: смена статуса, отмена с возвратом остатка
+│   ├── storage.py         фото товаров в хранилище по S3 API
+│   └── routers/           health, products, auth, cart, orders, payments, admin, admin_images
 └── frontend/
     ├── Dockerfile.prod    сборка фронта и образ Nginx для тестового окружения
     ├── nginx/             конфигурация Nginx: статика, прокси /api, заголовки
@@ -57,6 +62,8 @@ kroy/
    В `.env` заменить `change-me-owner` и `change-me-app` на свои пароли,
    а `change-me-jwt` на длинную случайную строку (ключ подписи токенов входа).
    Если `.env` создан до №6, добавить в него строку `JWT_SECRET=...`, иначе compose не запустится.
+   Если `.env` создан до этапа III, добавить из `.env.example` строки `MINIO_ACCESS_KEY`,
+   `MINIO_SECRET_KEY` (свой длинный ключ), `MINIO_BUCKET`, `ORDER_PAYMENT_TTL_MINUTES`, `PAYMENT_PROVIDER`.
    Если порты 5432, 8000 или 5173 заняты другим проектом, поменять `DB_HOST_PORT`,
    `BACKEND_HOST_PORT`, `FRONTEND_HOST_PORT`.
 3. Запустить:
@@ -69,7 +76,22 @@ kroy/
    - документация API (Swagger): http://localhost:8000/api/docs
    - проверка состояния: http://localhost:8000/api/health
 
-Остановить: `docker compose down`. Данные БД при этом сохраняются в томе `pgdata`.
+Остановить: `docker compose down`. Данные БД при этом сохраняются в томе `pgdata`, фото — в томе `media`.
+
+### Миграции
+
+Скрипты `db/0*.sql` создают схему этапа II только на пустом томе. Всё, что меняется
+позже, лежит в `db/migrations/V{номер}__{имя}.sql`. Одноразовый сервис `migrate`
+при каждом `up` применяет от `kroy_owner` только новые файлы и завершается,
+backend стартует после него. Применённые версии записаны в таблице `schema_migrations`;
+менять уже применённый файл нельзя, раннер остановится с ошибкой.
+
+```bash
+docker compose logs migrate
+docker compose exec db psql -U kroy_owner -d kroy -c "table schema_migrations"
+```
+
+Существующая БД этапа II обновляется без потери данных: `docker compose up -d --build`.
 
 ### Пересоздать БД с нуля
 
@@ -168,6 +190,49 @@ docker compose -f docker-compose.test.yml down -v                 # остано
 | GET | `/api/auth/me` | Текущий пользователь по токену | 200, 401 |
 | GET | `/api/cart` | Корзина текущего пользователя | 200, 401 |
 | POST | `/api/cart` | Добавить вариант товара в корзину | 200, 401, 404, 409, 422 |
+| PATCH | `/api/cart/items/{id}` | Изменить количество позиции | 200, 401, 404, 409, 422 |
+| DELETE | `/api/cart/items/{id}` | Удалить позицию | 200, 401, 404 |
+| GET | `/api/pickup-points` | Пункты выдачи | 200 |
+| POST | `/api/orders` | Оформить заказ из корзины (`Idempotency-Key` необязателен) | 200, 201, 401, 409, 422 |
+| GET | `/api/orders` | История заказов покупателя | 200, 401, 422 |
+| GET | `/api/orders/{id}` | Заказ с составом, платежами и историей статусов | 200, 401, 404 |
+| POST | `/api/orders/{id}/cancel` | Отменить неоплаченный заказ | 200, 401, 404, 409 |
+| POST | `/api/orders/{id}/payments` | Начать оплату (`Idempotency-Key` обязателен) | 200, 201, 401, 404, 409, 422 |
+| GET | `/api/payments/{id}` | Статус платежа | 200, 401, 404 |
+| POST | `/api/test-provider/payments/{provider_payment_id}` | Тестовый платёжный сервис: результат оплаты | 200, 404, 409 |
+| | `/api/admin/...` | Админка: товары, варианты, остатки, фото, заказы | 401 без токена, 403 не админ |
+
+Полное описание новых методов этапа III: [docs/stage3/api-design.md](docs/stage3/api-design.md),
+в Swagger сервера — разделы orders, payments, admin.
+
+### Заказы и оплата
+
+- Остаток списывается в момент оформления, в одной транзакции с заказом. Последнюю штуку
+  двое купить не могут: второй получит 409 «Недостаточно товара …: в наличии 0 шт.».
+- Заказ ждёт оплату `ORDER_PAYMENT_TTL_MINUTES` минут (15). Фоновая задача раз в минуту отменяет
+  просроченные и возвращает остаток. Отмена покупателем или админом тоже возвращает остаток.
+- Оплата в тестовом режиме: `POST /api/orders/{id}/payments` отдаёт `confirmation_url`
+  (`/pay/test/<id>`), результат сообщает `POST /api/test-provider/payments/<id>`
+  с `{"result": "succeeded"}` или `{"result": "failed", "failure_reason": "..."}`.
+- Повтор запроса с тем же `Idempotency-Key` не создаёт второй заказ или платёж, а возвращает
+  уже созданный с кодом 200.
+
+```bash
+curl -X POST http://localhost:8000/api/orders -H "Authorization: Bearer <токен>" \
+     -H "Content-Type: application/json" -H "Idempotency-Key: 6f1c2b7e-3d4a-4b8e-9f0a-1c2d3e4f5a6b" \
+     -d '{"delivery_method": "pickup", "pickup_point_id": 1, "contact_phone": "+79001112233"}'
+curl -X POST http://localhost:8000/api/orders/5/payments -H "Authorization: Bearer <токен>" \
+     -H "Idempotency-Key: 0d5e3c4b-2a1f-4e6d-8c7b-9a0f1e2d3c4b"
+curl -X POST http://localhost:8000/api/test-provider/payments/<provider_payment_id> \
+     -H "Content-Type: application/json" -d '{"result": "succeeded"}'
+```
+
+### Фото товаров
+
+Хранилище — SeaweedFS с S3 API (сервис `storage`, том `media`), наружу не открыто.
+Админ загружает фото через `POST /api/admin/products/{id}/images` (JPEG, PNG, WebP до 5 МБ,
+тип проверяется по содержимому файла). Отдаются фото по `/media/<ключ>`: в разработке через Vite,
+в тестовом окружении через Nginx, только на чтение.
 
 ### Вход и корзина
 

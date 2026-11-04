@@ -40,6 +40,51 @@ services:
     security_opt: ["no-new-privileges:true"]
     logging: *default-logging
 
+  # Одноразовый: применяет db/migrations от владельца схемы и завершается
+  migrate:
+    build: ./backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    command: python -m app.migrate
+    volumes:
+      - ./db/migrations:/app/migrations:ro
+    networks: [back]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    logging: *default-logging
+
+  # Хранилище фото с S3 API (SeaweedFS вместо MinIO: образы MinIO больше не публикуются).
+  # Портов наружу нет: Nginx отдаёт фото по /media/ только на чтение, backend пишет
+  storage:
+    image: chrislusf/seaweedfs:3.80
+    entrypoint: ["/bin/sh", "/start.sh"]
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Задайте MINIO_ACCESS_KEY в .env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Задайте MINIO_SECRET_KEY в .env}
+      MINIO_BUCKET: ${MINIO_BUCKET:-kroy-products}
+    volumes:
+      - ./storage/start.sh:/start.sh:ro
+      - media_test:/data
+    networks: [front, back]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
+    logging: *default-logging
+
   backend:
     build: ./backend
     environment:
@@ -50,6 +95,13 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в .env}
+      ORDER_PAYMENT_TTL_MINUTES: ${ORDER_PAYMENT_TTL_MINUTES:-15}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-test}
+      # Хранилище фото (S3 API, сервис storage)
+      MINIO_ENDPOINT: storage:8333
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Задайте MINIO_ACCESS_KEY в .env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Задайте MINIO_SECRET_KEY в .env}
+      MINIO_BUCKET: ${MINIO_BUCKET:-kroy-products}
     # Без --reload. --proxy-headers: адрес клиента берётся из X-Forwarded-For от Nginx
     command: >
       uvicorn app.main:app --host 0.0.0.0 --port 8000
@@ -69,6 +121,10 @@ services:
       start_period: 15s
     depends_on:
       db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      storage:
         condition: service_healthy
     restart: unless-stopped
     read_only: true
@@ -110,3 +166,4 @@ networks:
 
 volumes:
   pgdata_test:
+  media_test:
