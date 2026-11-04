@@ -3,13 +3,14 @@
 import logging
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Path
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db import get_db
 from app.models import CartItem, Product, ProductVariant, User
-from app.schemas import CartAddIn, CartItemOut, CartOut, ErrorOut
+from app.order_service import media_url
+from app.schemas import CartAddIn, CartItemOut, CartOut, CartUpdateIn, ErrorOut
 from app.security import get_current_user
 
 router = APIRouter(prefix="/cart", tags=["cart"], responses={401: {"model": ErrorOut}})
@@ -45,6 +46,7 @@ def _load_cart(db: Session, user_id: int) -> CartOut:
                 color=v.color,
                 sku=v.sku,
                 image_key=p.images[0].storage_key if p.images else None,
+                image_url=media_url(p.images[0].storage_key) if p.images else None,
                 price=p.price,
                 quantity=item.quantity,
                 stock=v.stock,
@@ -78,7 +80,7 @@ def add_to_cart(
     variant = db.scalar(
         select(ProductVariant).where(ProductVariant.id == data.variant_id).with_for_update()
     )
-    if variant is None or not variant.product.is_active:
+    if variant is None or not variant.is_active or not variant.product.is_active:
         raise HTTPException(status_code=404, detail="Товар не найден")
 
     item = db.scalar(
@@ -105,4 +107,52 @@ def add_to_cart(
     db.commit()
 
     log.info("Корзина user=%s: вариант %s, количество %s", user.id, variant.id, quantity)
+    return _load_cart(db, user.id)
+
+
+def _own_item(db: Session, user: User, item_id: int) -> CartItem:
+    item = db.scalar(
+        select(CartItem).where(CartItem.id == item_id, CartItem.user_id == user.id)
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Позиция корзины не найдена")
+    return item
+
+
+@router.patch(
+    "/items/{item_id}",
+    response_model=CartOut,
+    responses={404: {"model": ErrorOut}, 409: {"model": ErrorOut}},
+)
+def update_cart_item(
+    data: CartUpdateIn,
+    item_id: int = Path(ge=1),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CartOut:
+    """Задаёт количество позиции целиком (не прибавляет). Больше остатка нельзя."""
+    item = _own_item(db, user, item_id)
+    variant = db.scalar(
+        select(ProductVariant).where(ProductVariant.id == item.variant_id).with_for_update()
+    )
+    if not variant.is_active or not variant.product.is_active:
+        raise HTTPException(status_code=409, detail="Товар больше не продаётся, удалите его из корзины")
+    if data.quantity > variant.stock:
+        raise HTTPException(
+            status_code=409, detail=f"Недостаточно товара: в наличии {variant.stock} шт."
+        )
+    item.quantity = data.quantity
+    db.commit()
+    return _load_cart(db, user.id)
+
+
+@router.delete("/items/{item_id}", response_model=CartOut, responses={404: {"model": ErrorOut}})
+def delete_cart_item(
+    item_id: int = Path(ge=1),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CartOut:
+    _own_item(db, user, item_id)
+    db.execute(delete(CartItem).where(CartItem.id == item_id, CartItem.user_id == user.id))
+    db.commit()
     return _load_cart(db, user.id)

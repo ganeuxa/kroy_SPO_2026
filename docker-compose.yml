@@ -24,6 +24,45 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # Одноразовый: применяет db/migrations от владельца схемы и завершается.
+  # У kroy_app прав на изменение схемы нет.
+  migrate:
+    build: ./backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    command: python -m app.migrate
+    volumes:
+      - ./backend/app:/app/app
+      - ./db/migrations:/app/migrations:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # Хранилище фото с S3 API (SeaweedFS вместо MinIO: образы MinIO больше не публикуются).
+  # Наружу не открыто: фото отдаёт Vite (здесь) или Nginx (тестовое окружение) по /media/
+  storage:
+    image: chrislusf/seaweedfs:3.80
+    entrypoint: ["/bin/sh", "/start.sh"]
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Задайте MINIO_ACCESS_KEY в .env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Задайте MINIO_SECRET_KEY в .env}
+      MINIO_BUCKET: ${MINIO_BUCKET:-kroy-products}
+    volumes:
+      - ./storage/start.sh:/start.sh:ro
+      - media:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
   backend:
     build: ./backend
     environment:
@@ -34,6 +73,13 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в .env}
+      ORDER_PAYMENT_TTL_MINUTES: ${ORDER_PAYMENT_TTL_MINUTES:-15}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-test}
+      # Хранилище фото (S3 API, сервис storage)
+      MINIO_ENDPOINT: storage:8333
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?Задайте MINIO_ACCESS_KEY в .env}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?Задайте MINIO_SECRET_KEY в .env}
+      MINIO_BUCKET: ${MINIO_BUCKET:-kroy-products}
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./backend/app:/app/app
@@ -42,12 +88,17 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+      storage:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
     build: ./frontend
     environment:
       VITE_PROXY_TARGET: http://backend:8000
+      VITE_MEDIA_TARGET: http://storage:8333
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/index.html:/app/index.html
@@ -58,3 +109,4 @@ services:
 
 volumes:
   pgdata:
+  media:
