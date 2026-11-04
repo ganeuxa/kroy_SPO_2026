@@ -1,12 +1,14 @@
 """Модели таблиц из db/01_schema.sql.
 
-Схему создаёт SQL-скрипт, а не SQLAlchemy: модели только описывают уже
-существующие таблицы. Здесь пока те таблицы, что нужны каталогу и корзине;
-orders, payments и остальные добавляются по мере работы над сценариями.
+Схему создают SQL-скрипт и миграции из db/migrations, а не SQLAlchemy:
+модели только описывают уже существующие таблицы. favorites и reviews
+появятся на этапе IV.
 """
 
 from datetime import datetime
 from decimal import Decimal
+
+from uuid import UUID
 
 from sqlalchemy import ForeignKey, Numeric, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -46,6 +48,7 @@ class Product(Base):
     price: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     is_active: Mapped[bool] = mapped_column(server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
+    updated_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
 
     category: Mapped[Category] = relationship(lazy="joined")
     variants: Mapped[list["ProductVariant"]] = relationship(
@@ -65,6 +68,8 @@ class ProductVariant(Base):
     color: Mapped[str] = mapped_column(String(40))
     sku: Mapped[str] = mapped_column(String(40), unique=True)
     stock: Mapped[int] = mapped_column(server_default=text("0"))
+    is_active: Mapped[bool] = mapped_column(server_default=text("true"))
+    updated_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
 
     product: Mapped[Product] = relationship(back_populates="variants")
 
@@ -77,6 +82,9 @@ class ProductImage(Base):
     storage_key: Mapped[str] = mapped_column(String(255))
     color: Mapped[str | None] = mapped_column(String(40))
     sort_order: Mapped[int] = mapped_column(server_default=text("0"))
+    content_type: Mapped[str | None] = mapped_column(String(32))
+    size_bytes: Mapped[int | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
 
 
 class CartItem(Base):
@@ -89,3 +97,96 @@ class CartItem(Base):
     added_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
 
     variant: Mapped[ProductVariant] = relationship(lazy="joined")
+
+
+class PickupPoint(Base):
+    __tablename__ = "pickup_points"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    address: Mapped[str] = mapped_column(String(300), unique=True)
+    hours: Mapped[str | None] = mapped_column(String(120))
+    is_active: Mapped[bool] = mapped_column(server_default=text("true"))
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(16), server_default=text("'new'"))
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    delivery_method: Mapped[str] = mapped_column(String(16))
+    delivery_address: Mapped[str | None] = mapped_column(String(300))
+    pickup_point_id: Mapped[int | None] = mapped_column(ForeignKey("pickup_points.id"))
+    contact_phone: Mapped[str] = mapped_column(String(20))
+    comment: Mapped[str | None] = mapped_column(String(500))
+    expires_at: Mapped[datetime | None]
+    cancel_reason: Mapped[str | None] = mapped_column(String(16))
+    checkout_key: Mapped[UUID | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
+    updated_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
+
+    user: Mapped[User] = relationship()
+    pickup_point: Mapped[PickupPoint | None] = relationship()
+    items: Mapped[list["OrderItem"]] = relationship(order_by="OrderItem.id")
+    payments: Mapped[list["Payment"]] = relationship(order_by="Payment.id")
+    history: Mapped[list["OrderStatusHistory"]] = relationship(
+        order_by="OrderStatusHistory.id"
+    )
+
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    variant_id: Mapped[int] = mapped_column(ForeignKey("product_variants.id"))
+    quantity: Mapped[int]
+    price_at_purchase: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+
+    variant: Mapped[ProductVariant] = relationship()
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    provider_payment_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2))
+    status: Mapped[str] = mapped_column(String(16), server_default=text("'pending'"))
+    idempotency_key: Mapped[UUID | None]
+    provider: Mapped[str] = mapped_column(String(16), server_default=text("'test'"))
+    failure_reason: Mapped[str | None] = mapped_column(String(120))
+    created_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
+    paid_at: Mapped[datetime | None]
+
+
+class OrderStatusHistory(Base):
+    __tablename__ = "order_status_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    from_status: Mapped[str | None] = mapped_column(String(16))
+    to_status: Mapped[str] = mapped_column(String(16))
+    changed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    comment: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
+
+    author: Mapped[User | None] = relationship()
+
+
+class StockMovement(Base):
+    __tablename__ = "stock_movements"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    variant_id: Mapped[int] = mapped_column(ForeignKey("product_variants.id"))
+    delta: Mapped[int]
+    reason: Mapped[str] = mapped_column(String(16))
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"))
+    changed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    comment: Mapped[str | None] = mapped_column(String(300))
+    created_at: Mapped[datetime] = mapped_column(server_default=text("now()"))
+
+    author: Mapped[User | None] = relationship()

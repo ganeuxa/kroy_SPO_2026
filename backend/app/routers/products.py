@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
 from app.models import Category, Product, ProductVariant
+from app.order_service import media_url
 from app.schemas import (
     CategoryOut,
     ErrorOut,
@@ -63,7 +64,11 @@ def _apply_filters(
         )
     if size or color:
         # Нужен вариант с выбранным размером/цветом, который есть в наличии.
-        cond = [ProductVariant.product_id == Product.id, ProductVariant.stock > 0]
+        cond = [
+            ProductVariant.product_id == Product.id,
+            ProductVariant.is_active,
+            ProductVariant.stock > 0,
+        ]
         if size:
             cond.append(ProductVariant.size == size)
         if color:
@@ -120,7 +125,8 @@ def list_products(
             gender=p.gender,
             category=CategoryOut.model_validate(p.category),
             image_key=p.images[0].storage_key if p.images else None,
-            in_stock=any(v.stock > 0 for v in p.variants),
+            image_url=media_url(p.images[0].storage_key) if p.images else None,
+            in_stock=any(v.is_active and v.stock > 0 for v in p.variants),
         )
         for p in products
     ]
@@ -144,7 +150,11 @@ def get_product(
     if product is None:
         raise HTTPException(status_code=404, detail="Товар не найден")
 
-    variants = sorted(product.variants, key=lambda v: (v.color, _size_key(v.size)))
+    # Скрытые варианты в карточке не показываем: купить их уже нельзя
+    variants = sorted(
+        (v for v in product.variants if v.is_active),
+        key=lambda v: (v.color, _size_key(v.size)),
+    )
     return ProductDetail(
         id=product.id,
         name=product.name,
@@ -153,6 +163,7 @@ def get_product(
         gender=product.gender,
         category=CategoryOut.model_validate(product.category),
         image_keys=[img.storage_key for img in product.images],
+        image_urls=[media_url(img.storage_key) for img in product.images],
         variants=[
             VariantOut(
                 id=v.id, size=v.size, color=v.color, sku=v.sku,
@@ -171,7 +182,7 @@ def get_filters(db: Session = Depends(get_db)) -> Filters:
     active_variants = (
         select(ProductVariant)
         .join(Product, Product.id == ProductVariant.product_id)
-        .where(Product.is_active)
+        .where(Product.is_active, ProductVariant.is_active)
         .subquery()
     )
     sizes = db.scalars(select(active_variants.c.size).distinct()).all()

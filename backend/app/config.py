@@ -19,6 +19,21 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60 * 24
 
+    # Сколько ждём оплату нового заказа, потом он отменяется и остаток возвращается
+    order_payment_ttl_minutes: int = 15
+    # test — эмулятор платёжного сервиса внутри backend (docs/stage3/db-design.md, раздел 5)
+    payment_provider: str = "test"
+    # Как часто фоновая задача ищет просроченные заказы
+    expire_orders_interval_seconds: int = 60
+
+    # Хранилище фото по S3 API. Без MINIO_ENDPOINT загрузка фото отвечает 503,
+    # остальной сервер работает
+    minio_endpoint: str | None = None
+    minio_access_key: str = ""
+    minio_secret_key: str = ""
+    minio_bucket: str = "kroy-products"
+    minio_secure: bool = False
+
     @property
     def database_url(self) -> str:
         return (

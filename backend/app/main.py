@@ -1,12 +1,16 @@
+import asyncio
 import logging
 import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import InterfaceError, OperationalError
 
 from app.config import settings
-from app.routers import auth, cart, health, products
+from app.db import SessionLocal
+from app.order_service import expire_orders
+from app.routers import admin, admin_images, auth, cart, health, orders, payments, products
 
 logging.basicConfig(
     level=settings.log_level,
@@ -14,17 +18,48 @@ logging.basicConfig(
 )
 log = logging.getLogger("kroy")
 
+
+def _expire_once() -> int:
+    with SessionLocal() as db:
+        return expire_orders(db)
+
+
+async def _expire_orders_loop() -> None:
+    """Раз в минуту отменяет неоплаченные заказы с истёкшим сроком и возвращает остаток."""
+    while True:
+        try:
+            count = await asyncio.to_thread(_expire_once)
+            if count:
+                log.info("Отменено просроченных заказов: %s", count)
+        except Exception:
+            # БД может быть недоступна: задача не падает, а пробует снова через минуту
+            log.exception("Фоновая отмена просроченных заказов не удалась")
+        await asyncio.sleep(settings.expire_orders_interval_seconds)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_expire_orders_loop())
+    yield
+    task.cancel()
+
+
 app = FastAPI(
     title="Крой API",
     version="0.1.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 app.include_router(health.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
 app.include_router(auth.router, prefix="/api")
 app.include_router(cart.router, prefix="/api")
+app.include_router(orders.router, prefix="/api")
+app.include_router(payments.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
+app.include_router(admin_images.router, prefix="/api")
 
 
 @app.middleware("http")

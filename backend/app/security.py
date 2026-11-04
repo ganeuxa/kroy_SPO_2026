@@ -1,16 +1,19 @@
 """Пароли (bcrypt) и токены входа (JWT) для FR-01, FR-02."""
 
+import logging
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db
 from app.models import User
+
+log = logging.getLogger("kroy.security")
 
 # auto_error=False: без заголовка отвечаем своим 401 с понятным текстом, а не 403 FastAPI
 bearer = HTTPBearer(auto_error=False, description="Токен из /api/auth/login")
@@ -71,4 +74,13 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None or not user.is_active:
         raise _unauthorized("Пользователь не найден или заблокирован")
+    return user
+
+
+def require_admin(request: Request, user: User = Depends(get_current_user)) -> User:
+    """Висит на всём роутере /api/admin (FR-16, NFR-04). Роль берётся из БД, а не из токена:
+    снятая роль администратора действует сразу, не дожидаясь истечения токена."""
+    if user.role != "admin":
+        log.warning("403 на %s %s: user=%s не администратор", request.method, request.url.path, user.id)
+        raise HTTPException(status_code=403, detail="Недостаточно прав")
     return user
