@@ -1,0 +1,2419 @@
+# Сгенерировано build_openapi.py, правьте stage3-paths.yaml
+openapi: 3.1.0
+info:
+  title: Крой API
+  version: 0.3.0
+  description: 'Интернет-магазин одежды «Крой». Версия этапа III: корзина целиком (FR-07), заказы (FR-08, FR-10), тестовая
+    оплата (FR-09) и админка (FR-13…FR-16).
+
+
+    Общие правила: ошибки — `{"detail": "..."}`, ошибки валидации (422) — формат FastAPI; суммы — строки с двумя знаками;
+    даты — ISO 8601 с часовым поясом; списки — `{items, total, limit, offset}`. Защищённые методы требуют `Authorization:
+    Bearer <токен>`; методы `/api/admin/*` без токена отвечают 401, покупателю — 403 (NFR-04).'
+paths:
+  /api/health:
+    get:
+      tags:
+      - service
+      summary: Сервер работает и БД доступна
+      description: Жив ли сервер и есть ли связь с БД. Используется в healthcheck контейнера.
+      operationId: health_api_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /api/products:
+    get:
+      tags:
+      - catalog
+      summary: Каталог с фильтрами, поиском и страницами
+      operationId: list_products_api_products_get
+      parameters:
+      - name: gender
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - men
+            - women
+            - unisex
+            type: string
+          - type: 'null'
+          title: Gender
+      - name: category
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          description: slug категории
+          title: Category
+        description: slug категории
+      - name: size
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 10
+          - type: 'null'
+          title: Size
+      - name: color
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Color
+      - name: price_min
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: string
+          - type: 'null'
+          title: Price Min
+      - name: price_max
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: number
+            minimum: 0.0
+          - type: string
+          - type: 'null'
+          title: Price Max
+      - name: q
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 100
+          - type: 'null'
+          description: поиск по названию
+          title: Q
+        description: поиск по названию
+      - name: sort
+        in: query
+        required: false
+        schema:
+          enum:
+          - new
+          - price_asc
+          - price_desc
+          type: string
+          default: new
+          title: Sort
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 24
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductList'
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unprocessable Content
+  /api/products/{product_id}:
+    get:
+      tags:
+      - catalog
+      summary: Карточка товара с вариантами
+      operationId: get_product_api_products__product_id__get
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Product Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductDetail'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/filters:
+    get:
+      tags:
+      - catalog
+      summary: Значения для фильтров каталога
+      description: 'Значения для фильтров каталога: берутся из видимых товаров.'
+      operationId: get_filters_api_filters_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Filters'
+  /api/auth/register:
+    post:
+      tags:
+      - auth
+      summary: Регистрация, сразу возвращает токен
+      operationId: register_api_auth_register_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterIn'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenOut'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/auth/login:
+    post:
+      tags:
+      - auth
+      summary: Вход по email и паролю
+      operationId: login_api_auth_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenOut'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/auth/me:
+    get:
+      tags:
+      - auth
+      summary: Текущий пользователь по токену
+      operationId: me_api_auth_me_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserOut'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+      security:
+      - HTTPBearer: []
+  /api/cart:
+    get:
+      tags:
+      - cart
+      summary: Корзина текущего пользователя
+      operationId: get_cart_api_cart_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartOut'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+      security:
+      - HTTPBearer: []
+    post:
+      tags:
+      - cart
+      summary: Добавить вариант товара в корзину
+      description: Добавляет вариант товара в корзину. Если он уже там, увеличивает количество.
+      operationId: add_to_cart_api_cart_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartAddIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartOut'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '409':
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - HTTPBearer: []
+  /api/cart/items/{item_id}:
+    parameters:
+    - $ref: '#/components/parameters/ItemId'
+    patch:
+      tags:
+      - cart
+      summary: Изменить количество позиции в корзине
+      description: FR-07. Количество задаётся целиком, не прибавляется. Больше остатка поставить нельзя.
+      operationId: update_cart_item
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CartUpdateIn'
+            example:
+              quantity: 3
+      responses:
+        '200':
+          description: Корзина целиком
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    delete:
+      tags:
+      - cart
+      summary: Удалить позицию из корзины
+      description: FR-07. Чужая или несуществующая позиция — 404.
+      operationId: delete_cart_item
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Корзина без этой позиции
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/pickup-points:
+    get:
+      tags:
+      - orders
+      summary: Пункты выдачи для самовывоза
+      operationId: list_pickup_points
+      responses:
+        '200':
+          description: Активные пункты выдачи
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PickupPoint'
+  /api/orders:
+    post:
+      tags:
+      - orders
+      summary: Оформить заказ из корзины
+      description: 'FR-08, NFR-08. В одной транзакции проверяет и списывает остатки, создаёт заказ со статусом `new`
+
+        и сроком оплаты `expires_at`, очищает корзину. Повтор с тем же `Idempotency-Key` возвращает
+
+        уже созданный заказ с кодом 200 и не создаёт второй.
+
+        '
+      operationId: create_order
+      security:
+      - HTTPBearer: []
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateIn'
+            examples:
+              courier:
+                summary: Курьер
+                value:
+                  delivery_method: courier
+                  delivery_address: Москва, ул. Тверская, д. 10, кв. 5
+                  contact_phone: '+79001112233'
+                  comment: Позвонить за час
+              pickup:
+                summary: Самовывоз
+                value:
+                  delivery_method: pickup
+                  pickup_point_id: 1
+                  contact_phone: '+79001112233'
+      responses:
+        '201':
+          description: Заказ создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        '200':
+          description: Повтор запроса с тем же ключом, возвращён ранее созданный заказ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Корзина пуста или товара не хватает
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+              examples:
+                empty:
+                  value:
+                    detail: Корзина пуста
+                stock:
+                  value:
+                    detail: 'Недостаточно товара «Футболка базовая» (M, белый): в наличии 0 шт.'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    get:
+      tags:
+      - orders
+      summary: История заказов покупателя
+      description: FR-10. Только заказы текущего пользователя, новые сверху.
+      operationId: list_my_orders
+      security:
+      - HTTPBearer: []
+      parameters:
+      - $ref: '#/components/parameters/StatusFilter'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Страница заказов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/orders/{order_id}:
+    parameters:
+    - $ref: '#/components/parameters/OrderId'
+    get:
+      tags:
+      - orders
+      summary: Заказ покупателя с составом, платежами и историей статусов
+      description: FR-10. Чужой заказ — 404, а не 403, чтобы нельзя было перебором узнать, какие номера существуют.
+      operationId: get_my_order
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Заказ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/orders/{order_id}/cancel:
+    parameters:
+    - $ref: '#/components/parameters/OrderId'
+    post:
+      tags:
+      - orders
+      summary: Отменить неоплаченный заказ
+      description: Только статус `new`. Списанный под заказ остаток возвращается на склад.
+      operationId: cancel_my_order
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Отменённый заказ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Заказ уже оплачен или отменён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+              example:
+                detail: Оплаченный заказ отменяет только магазин
+  /api/orders/{order_id}/payments:
+    parameters:
+    - $ref: '#/components/parameters/OrderId'
+    post:
+      tags:
+      - payments
+      summary: Начать оплату заказа
+      description: 'FR-09, NFR-09. Создаёт платёж `pending` и возвращает `confirmation_url` — страницу платёжного
+
+        сервиса, где покупатель вводит карту. Номер карты на наш сервер не приходит.
+
+        `Idempotency-Key` обязателен: повтор с тем же ключом возвращает тот же платёж с кодом 200.
+
+        '
+      operationId: create_payment
+      security:
+      - HTTPBearer: []
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '201':
+          description: Платёж создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOut'
+        '200':
+          description: Повтор с тем же ключом
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Заказ нельзя оплатить
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+              examples:
+                expired:
+                  value:
+                    detail: Срок оплаты истёк, заказ отменён
+                paid:
+                  value:
+                    detail: Заказ уже оплачен
+                pending:
+                  value:
+                    detail: Оплата уже начата в другой вкладке
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/payments/{payment_id}:
+    parameters:
+    - name: payment_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    get:
+      tags:
+      - payments
+      summary: Статус платежа
+      description: Фронт опрашивает его после возврата со страницы платёжного сервиса.
+      operationId: get_payment
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Платёж
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/test-provider/payments/{provider_payment_id}:
+    parameters:
+    - name: provider_payment_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      tags:
+      - payments
+      summary: 'Тестовый платёжный сервис: результат оплаты'
+      description: 'Работает только при `PAYMENT_PROVIDER=test`, иначе 404. Играет роль уведомления от платёжного
+
+        сервиса. Повторное уведомление ничего не меняет и возвращает 200.
+
+        '
+      operationId: test_provider_complete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestProviderResultIn'
+            example:
+              result: succeeded
+      responses:
+        '200':
+          description: Платёж после обработки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOut'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /api/admin/products:
+    get:
+      tags:
+      - admin
+      summary: Товары для админки, включая скрытые
+      operationId: admin_list_products
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 100
+      - name: category
+        in: query
+        schema:
+          type: string
+          maxLength: 80
+      - name: is_active
+        in: query
+        schema:
+          type: boolean
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Страница товаров
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProductList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    post:
+      tags:
+      - admin
+      summary: Создать товар
+      description: FR-13. Варианты и фото добавляются отдельными запросами.
+      operationId: admin_create_product
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminProductIn'
+            example:
+              category_id: 1
+              name: Футболка с принтом
+              description: Хлопок 100%
+              gender: unisex
+              price: '1990.00'
+      responses:
+        '201':
+          description: Товар создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProductOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: Нет такой категории
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/admin/products/{product_id}:
+    parameters:
+    - name: product_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    get:
+      tags:
+      - admin
+      summary: Товар со всеми вариантами и фото
+      operationId: admin_get_product
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Товар
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProductOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags:
+      - admin
+      summary: Изменить или скрыть товар
+      description: FR-13. Передаются только меняемые поля. Скрыть — `is_active false`, физически товар не удаляется.
+      operationId: admin_update_product
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminProductPatch'
+            example:
+              price: '1790.00'
+              is_active: false
+      responses:
+        '200':
+          description: Товар после изменения
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProductOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/admin/products/{product_id}/variants:
+    parameters:
+    - name: product_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    post:
+      tags:
+      - admin
+      summary: Добавить вариант товара (размер и цвет)
+      description: FR-14. Начальный остаток записывается в журнал движения остатков.
+      operationId: admin_create_variant
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminVariantIn'
+            example:
+              size: L
+              color: чёрный
+              sku: TSH-P-L-BLK
+              initial_stock: 10
+      responses:
+        '201':
+          description: Вариант создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVariantOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Такой SKU или такая пара размер и цвет уже есть
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+              example:
+                detail: Вариант L, чёрный у этого товара уже есть
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/admin/variants/{variant_id}:
+    parameters:
+    - $ref: '#/components/parameters/VariantId'
+    patch:
+      tags:
+      - admin
+      summary: Изменить или скрыть вариант
+      description: FR-14. Остаток здесь не меняется, для него есть корректировки.
+      operationId: admin_update_variant
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminVariantPatch'
+            example:
+              is_active: false
+      responses:
+        '200':
+          description: Вариант после изменения
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVariantOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/admin/variants/{variant_id}/stock-movements:
+    parameters:
+    - $ref: '#/components/parameters/VariantId'
+    post:
+      tags:
+      - admin
+      summary: Корректировка остатка (+N или −N)
+      description: 'FR-14, NFR-08. Остаток меняется на `delta`, а не устанавливается числом, чтобы правка не затёрла
+
+        резерв покупателя, сделанный в ту же секунду. Уйти ниже нуля нельзя — 409.
+
+        '
+      operationId: admin_adjust_stock
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StockAdjustmentIn'
+            example:
+              delta: 5
+              comment: Поставка 05.11
+      responses:
+        '201':
+          description: Запись журнала и новый остаток
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockMovementOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Остаток ушёл бы ниже нуля
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+              example:
+                detail: 'Нельзя списать 5 шт.: в наличии 2 шт.'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    get:
+      tags:
+      - admin
+      summary: Журнал движения остатка варианта
+      operationId: admin_list_stock_movements
+      security:
+      - HTTPBearer: []
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Записи журнала, новые сверху
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockMovementList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/admin/products/{product_id}/images:
+    parameters:
+    - name: product_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    post:
+      tags:
+      - admin
+      summary: Загрузить фото товара в MinIO
+      description: FR-13. JPEG, PNG или WebP до 5 МБ. Тип проверяется по содержимому файла, а не по расширению.
+      operationId: admin_upload_image
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                color:
+                  type: string
+                  maxLength: 40
+                  description: Цвет варианта, к которому относится фото. Необязательно
+                sort_order:
+                  type: integer
+                  minimum: 0
+                  maximum: 100
+                  default: 0
+      responses:
+        '201':
+          description: Фото сохранено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          description: Файл больше 5 МБ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+              example:
+                detail: Файл больше 5 МБ
+        '415':
+          description: Не JPEG, PNG или WebP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+              example:
+                detail: Поддерживаются только JPEG, PNG и WebP
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '503':
+          description: Хранилище фото недоступно
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+              example:
+                detail: Хранилище фото недоступно, попробуйте позже
+  /api/admin/images/{image_id}:
+    parameters:
+    - name: image_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    patch:
+      tags:
+      - admin
+      summary: Изменить цвет или порядок фото
+      operationId: admin_update_image
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImagePatch'
+      responses:
+        '200':
+          description: Фото после изменения
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    delete:
+      tags:
+      - admin
+      summary: Удалить фото
+      description: Удаляет строку в БД и файл в MinIO.
+      operationId: admin_delete_image
+      security:
+      - HTTPBearer: []
+      responses:
+        '204':
+          description: Фото удалено
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/admin/orders:
+    get:
+      tags:
+      - admin
+      summary: Все заказы с фильтрами
+      description: FR-15.
+      operationId: admin_list_orders
+      security:
+      - HTTPBearer: []
+      parameters:
+      - $ref: '#/components/parameters/StatusFilter'
+      - name: user_email
+        in: query
+        schema:
+          type: string
+          maxLength: 255
+        description: Часть email покупателя
+      - name: date_from
+        in: query
+        schema:
+          type: string
+          format: date
+        example: '2026-11-01'
+      - name: date_to
+        in: query
+        schema:
+          type: string
+          format: date
+        example: '2026-11-30'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Страница заказов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /api/admin/orders/{order_id}:
+    parameters:
+    - $ref: '#/components/parameters/OrderId'
+    get:
+      tags:
+      - admin
+      summary: Любой заказ с составом, платежами и историей
+      operationId: admin_get_order
+      security:
+      - HTTPBearer: []
+      responses:
+        '200':
+          description: Заказ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/admin/orders/{order_id}/status:
+    parameters:
+    - $ref: '#/components/parameters/OrderId'
+    post:
+      tags:
+      - admin
+      summary: Сменить статус заказа
+      description: 'FR-15. Допустимые переходы: `new → cancelled`, `paid → shipped`, `paid → cancelled`,
+
+        `shipped → delivered`. В `paid` заказ переводит только оплата. При отмене остаток возвращается.
+
+        '
+      operationId: admin_change_order_status
+      security:
+      - HTTPBearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusChangeIn'
+            example:
+              status: shipped
+              comment: Передан в СДЭК, трек 1234567890
+      responses:
+        '200':
+          description: Заказ после смены статуса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderOut'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Недопустимый переход
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+              example:
+                detail: Нельзя перевести заказ из статуса new в delivered
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+components:
+  schemas:
+    CartAddIn:
+      properties:
+        variant_id:
+          type: integer
+          minimum: 1.0
+          title: Variant Id
+        quantity:
+          type: integer
+          maximum: 99.0
+          minimum: 1.0
+          title: Quantity
+          default: 1
+      type: object
+      required:
+      - variant_id
+      title: CartAddIn
+    CartItemOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        variant_id:
+          type: integer
+          title: Variant Id
+        product_id:
+          type: integer
+          title: Product Id
+        name:
+          type: string
+          title: Name
+        size:
+          type: string
+          title: Size
+        color:
+          type: string
+          title: Color
+        sku:
+          type: string
+          title: Sku
+        image_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Image Key
+        price:
+          type: string
+          title: Price
+        quantity:
+          type: integer
+          title: Quantity
+        stock:
+          type: integer
+          title: Stock
+        line_total:
+          type: string
+          title: Line Total
+        image_url:
+          type:
+          - string
+          - 'null'
+          description: Новое в этапе III
+      type: object
+      required:
+      - id
+      - variant_id
+      - product_id
+      - name
+      - size
+      - color
+      - sku
+      - image_key
+      - price
+      - quantity
+      - stock
+      - line_total
+      title: CartItemOut
+    CartOut:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/CartItemOut'
+          type: array
+          title: Items
+        total_quantity:
+          type: integer
+          title: Total Quantity
+        total:
+          type: string
+          title: Total
+      type: object
+      required:
+      - items
+      - total_quantity
+      - total
+      title: CartOut
+    CategoryOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        slug:
+          type: string
+          title: Slug
+      type: object
+      required:
+      - id
+      - name
+      - slug
+      title: CategoryOut
+    ErrorOut:
+      properties:
+        detail:
+          type: string
+          title: Detail
+      type: object
+      required:
+      - detail
+      title: ErrorOut
+    Filters:
+      properties:
+        categories:
+          items:
+            $ref: '#/components/schemas/CategoryOut'
+          type: array
+          title: Categories
+        sizes:
+          items:
+            type: string
+          type: array
+          title: Sizes
+        colors:
+          items:
+            type: string
+          type: array
+          title: Colors
+        price_min:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Price Min
+        price_max:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Price Max
+      type: object
+      required:
+      - categories
+      - sizes
+      - colors
+      - price_min
+      - price_max
+      title: Filters
+      description: Значения для выпадающих списков фильтров каталога.
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    LoginIn:
+      properties:
+        email:
+          type: string
+          maxLength: 255
+          minLength: 3
+          title: Email
+        password:
+          type: string
+          maxLength: 72
+          minLength: 1
+          title: Password
+      type: object
+      required:
+      - email
+      - password
+      title: LoginIn
+    ProductDetail:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        price:
+          type: string
+          title: Price
+        gender:
+          type: string
+          title: Gender
+        category:
+          $ref: '#/components/schemas/CategoryOut'
+        image_keys:
+          items:
+            type: string
+          type: array
+          title: Image Keys
+        variants:
+          items:
+            $ref: '#/components/schemas/VariantOut'
+          type: array
+          title: Variants
+        image_urls:
+          type: array
+          items:
+            type: string
+          description: Новое в этапе III. Ссылки на фото по порядку
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - price
+      - gender
+      - category
+      - image_keys
+      - variants
+      title: ProductDetail
+    ProductList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ProductListItem'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      title: ProductList
+    ProductListItem:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        price:
+          type: string
+          title: Price
+        gender:
+          type: string
+          title: Gender
+        category:
+          $ref: '#/components/schemas/CategoryOut'
+        image_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Image Key
+        in_stock:
+          type: boolean
+          title: In Stock
+        image_url:
+          type:
+          - string
+          - 'null'
+          example: /media/products/1/3c9e1f0a.jpg
+          description: Новое в этапе III. Готовая ссылка на первое фото
+      type: object
+      required:
+      - id
+      - name
+      - price
+      - gender
+      - category
+      - image_key
+      - in_stock
+      title: ProductListItem
+    RegisterIn:
+      properties:
+        email:
+          type: string
+          maxLength: 255
+          format: email
+          title: Email
+        password:
+          type: string
+          maxLength: 72
+          minLength: 8
+          title: Password
+        full_name:
+          type: string
+          maxLength: 120
+          minLength: 1
+          title: Full Name
+        phone:
+          anyOf:
+          - type: string
+            pattern: ^\+?[0-9]{10,15}$
+          - type: 'null'
+          title: Phone
+          examples:
+          - '+79001112233'
+      type: object
+      required:
+      - email
+      - password
+      - full_name
+      title: RegisterIn
+    TokenOut:
+      properties:
+        access_token:
+          type: string
+          title: Access Token
+        token_type:
+          type: string
+          title: Token Type
+          default: bearer
+        user:
+          $ref: '#/components/schemas/UserOut'
+      type: object
+      required:
+      - access_token
+      - user
+      title: TokenOut
+    UserOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        email:
+          type: string
+          title: Email
+        full_name:
+          type: string
+          title: Full Name
+        phone:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Phone
+        role:
+          type: string
+          title: Role
+      type: object
+      required:
+      - id
+      - email
+      - full_name
+      - phone
+      - role
+      title: UserOut
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    VariantOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        size:
+          type: string
+          title: Size
+        color:
+          type: string
+          title: Color
+        sku:
+          type: string
+          title: Sku
+        stock:
+          type: integer
+          title: Stock
+        in_stock:
+          type: boolean
+          title: In Stock
+      type: object
+      required:
+      - id
+      - size
+      - color
+      - sku
+      - stock
+      - in_stock
+      title: VariantOut
+    Money:
+      type: string
+      pattern: ^\d{1,8}\.\d{2}$
+      description: Сумма в рублях строкой с двумя знаками после точки, чтобы не терять копейки
+      example: '1290.00'
+    OrderStatus:
+      type: string
+      enum:
+      - new
+      - paid
+      - shipped
+      - delivered
+      - cancelled
+      description: new — ждёт оплаты, paid — оплачен, shipped — передан в доставку, delivered — получен, cancelled — отменён
+    CartUpdateIn:
+      type: object
+      required:
+      - quantity
+      properties:
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 99
+    PickupPoint:
+      type: object
+      required:
+      - id
+      - name
+      - address
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+          example: Пункт выдачи «Вернадского»
+        address:
+          type: string
+          example: Москва, пр. Вернадского, 78
+        hours:
+          type:
+          - string
+          - 'null'
+          example: Ежедневно 10:00–21:00
+    OrderCreateIn:
+      type: object
+      required:
+      - delivery_method
+      - contact_phone
+      properties:
+        delivery_method:
+          type: string
+          enum:
+          - courier
+          - pickup
+        delivery_address:
+          type:
+          - string
+          - 'null'
+          minLength: 5
+          maxLength: 300
+          description: Обязателен для courier, запрещён для pickup
+        pickup_point_id:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          description: Обязателен для pickup, запрещён для courier
+        contact_phone:
+          type: string
+          pattern: ^\+?[0-9]{10,15}$
+          example: '+79001112233'
+        comment:
+          type:
+          - string
+          - 'null'
+          maxLength: 500
+    OrderItemOut:
+      type: object
+      required:
+      - variant_id
+      - product_id
+      - name
+      - size
+      - color
+      - sku
+      - quantity
+      - price
+      - line_total
+      properties:
+        variant_id:
+          type: integer
+        product_id:
+          type: integer
+        name:
+          type: string
+        size:
+          type: string
+        color:
+          type: string
+        sku:
+          type: string
+        image_url:
+          type:
+          - string
+          - 'null'
+          example: /media/products/1/3c9e.jpg
+        quantity:
+          type: integer
+        price:
+          $ref: '#/components/schemas/Money'
+        line_total:
+          $ref: '#/components/schemas/Money'
+    StatusChangeOut:
+      type: object
+      required:
+      - to_status
+      - changed_by
+      - created_at
+      properties:
+        from_status:
+          oneOf:
+          - $ref: '#/components/schemas/OrderStatus'
+          - type: 'null'
+        to_status:
+          $ref: '#/components/schemas/OrderStatus'
+        changed_by:
+          type: string
+          enum:
+          - customer
+          - admin
+          - system
+          description: Кто сменил статус. Конкретного администратора покупателю не показываем
+        comment:
+          type:
+          - string
+          - 'null'
+        created_at:
+          type: string
+          format: date-time
+    PaymentOut:
+      type: object
+      required:
+      - id
+      - order_id
+      - status
+      - amount
+      - created_at
+      properties:
+        id:
+          type: integer
+        order_id:
+          type: integer
+        status:
+          type: string
+          enum:
+          - pending
+          - succeeded
+          - failed
+          - cancelled
+        amount:
+          $ref: '#/components/schemas/Money'
+        confirmation_url:
+          type:
+          - string
+          - 'null'
+          description: Страница платёжного сервиса, только у pending
+          example: /pay/test/0b9f5c1e-8a2d-4f3b-9c7e-2d1a4b6c8e0f
+        failure_reason:
+          type:
+          - string
+          - 'null'
+          example: Недостаточно средств
+        created_at:
+          type: string
+          format: date-time
+        paid_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    TestProviderResultIn:
+      type: object
+      required:
+      - result
+      properties:
+        result:
+          type: string
+          enum:
+          - succeeded
+          - failed
+        failure_reason:
+          type:
+          - string
+          - 'null'
+          maxLength: 120
+    OrderSummary:
+      type: object
+      required:
+      - id
+      - status
+      - total_amount
+      - items_count
+      - delivery_method
+      - created_at
+      properties:
+        id:
+          type: integer
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        total_amount:
+          $ref: '#/components/schemas/Money'
+        items_count:
+          type: integer
+          description: Сколько всего штук в заказе
+        delivery_method:
+          type: string
+          enum:
+          - courier
+          - pickup
+        created_at:
+          type: string
+          format: date-time
+        expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: До какого момента нужно оплатить. Только у new
+    OrderDetail:
+      allOf:
+      - $ref: '#/components/schemas/OrderSummary'
+      - type: object
+        required:
+        - contact_phone
+        - items
+        - payments
+        - history
+        properties:
+          delivery_address:
+            type:
+            - string
+            - 'null'
+          pickup_point:
+            oneOf:
+            - $ref: '#/components/schemas/PickupPoint'
+            - type: 'null'
+          contact_phone:
+            type: string
+          comment:
+            type:
+            - string
+            - 'null'
+          cancel_reason:
+            type:
+            - string
+            - 'null'
+            enum:
+            - customer
+            - expired
+            - admin
+            - payment_failed
+            - null
+          items:
+            type: array
+            items:
+              $ref: '#/components/schemas/OrderItemOut'
+          payments:
+            type: array
+            items:
+              $ref: '#/components/schemas/PaymentOut'
+          history:
+            type: array
+            items:
+              $ref: '#/components/schemas/StatusChangeOut'
+    OrderList:
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderSummary'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+    CustomerShort:
+      type: object
+      required:
+      - id
+      - email
+      - full_name
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        full_name:
+          type: string
+        phone:
+          type:
+          - string
+          - 'null'
+    AdminOrderOut:
+      allOf:
+      - $ref: '#/components/schemas/OrderDetail'
+      - type: object
+        required:
+        - customer
+        properties:
+          customer:
+            $ref: '#/components/schemas/CustomerShort'
+    AdminOrderList:
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      properties:
+        items:
+          type: array
+          items:
+            allOf:
+            - $ref: '#/components/schemas/OrderSummary'
+            - type: object
+              required:
+              - customer
+              properties:
+                customer:
+                  $ref: '#/components/schemas/CustomerShort'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+    OrderStatusChangeIn:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - shipped
+          - delivered
+          - cancelled
+        comment:
+          type:
+          - string
+          - 'null'
+          maxLength: 300
+    AdminProductIn:
+      type: object
+      required:
+      - category_id
+      - name
+      - gender
+      - price
+      properties:
+        category_id:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type:
+          - string
+          - 'null'
+          maxLength: 5000
+        gender:
+          type: string
+          enum:
+          - men
+          - women
+          - unisex
+        price:
+          $ref: '#/components/schemas/Money'
+        is_active:
+          type: boolean
+          default: true
+    AdminProductPatch:
+      type: object
+      minProperties: 1
+      properties:
+        category_id:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type:
+          - string
+          - 'null'
+          maxLength: 5000
+        gender:
+          type: string
+          enum:
+          - men
+          - women
+          - unisex
+        price:
+          $ref: '#/components/schemas/Money'
+        is_active:
+          type: boolean
+    AdminVariantIn:
+      type: object
+      required:
+      - size
+      - color
+      - sku
+      properties:
+        size:
+          type: string
+          minLength: 1
+          maxLength: 10
+        color:
+          type: string
+          minLength: 1
+          maxLength: 40
+        sku:
+          type: string
+          pattern: ^[A-Z0-9-]{3,40}$
+        initial_stock:
+          type: integer
+          minimum: 0
+          maximum: 10000
+          default: 0
+    AdminVariantPatch:
+      type: object
+      minProperties: 1
+      properties:
+        size:
+          type: string
+          minLength: 1
+          maxLength: 10
+        color:
+          type: string
+          minLength: 1
+          maxLength: 40
+        sku:
+          type: string
+          pattern: ^[A-Z0-9-]{3,40}$
+        is_active:
+          type: boolean
+    AdminVariantOut:
+      type: object
+      required:
+      - id
+      - product_id
+      - size
+      - color
+      - sku
+      - stock
+      - is_active
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        size:
+          type: string
+        color:
+          type: string
+        sku:
+          type: string
+        stock:
+          type: integer
+        is_active:
+          type: boolean
+    ImageOut:
+      type: object
+      required:
+      - id
+      - product_id
+      - image_url
+      - sort_order
+      properties:
+        id:
+          type: integer
+        product_id:
+          type: integer
+        image_url:
+          type: string
+          example: /media/products/1/3c9e1f0a.jpg
+        color:
+          type:
+          - string
+          - 'null'
+        sort_order:
+          type: integer
+        content_type:
+          type:
+          - string
+          - 'null'
+          enum:
+          - image/jpeg
+          - image/png
+          - image/webp
+          - null
+        size_bytes:
+          type:
+          - integer
+          - 'null'
+    ImagePatch:
+      type: object
+      minProperties: 1
+      properties:
+        color:
+          type:
+          - string
+          - 'null'
+          maxLength: 40
+        sort_order:
+          type: integer
+          minimum: 0
+          maximum: 100
+    AdminProductOut:
+      type: object
+      required:
+      - id
+      - category
+      - name
+      - gender
+      - price
+      - is_active
+      - created_at
+      - updated_at
+      - variants
+      - images
+      properties:
+        id:
+          type: integer
+        category:
+          $ref: '#/components/schemas/CategoryOut'
+        name:
+          type: string
+        description:
+          type:
+          - string
+          - 'null'
+        gender:
+          type: string
+          enum:
+          - men
+          - women
+          - unisex
+        price:
+          $ref: '#/components/schemas/Money'
+        is_active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminVariantOut'
+        images:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageOut'
+    AdminProductList:
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminProductOut'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+    StockAdjustmentIn:
+      type: object
+      required:
+      - delta
+      - comment
+      properties:
+        delta:
+          type: integer
+          minimum: -10000
+          maximum: 10000
+          not:
+            const: 0
+          description: Положительное — приход, отрицательное — списание
+        comment:
+          type: string
+          minLength: 1
+          maxLength: 300
+    StockMovementOut:
+      type: object
+      required:
+      - id
+      - variant_id
+      - delta
+      - reason
+      - created_at
+      properties:
+        id:
+          type: integer
+        variant_id:
+          type: integer
+        delta:
+          type: integer
+        reason:
+          type: string
+          enum:
+          - reserve
+          - release
+          - adjust
+          - initial
+        order_id:
+          type:
+          - integer
+          - 'null'
+        changed_by:
+          oneOf:
+          - $ref: '#/components/schemas/CustomerShort'
+          - type: 'null'
+        comment:
+          type:
+          - string
+          - 'null'
+        stock_after:
+          type:
+          - integer
+          - 'null'
+          description: Остаток после изменения. Заполняется в ответе на корректировку
+        created_at:
+          type: string
+          format: date-time
+    StockMovementList:
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StockMovementOut'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ItemId:
+      name: item_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+      description: id позиции корзины из GET /api/cart
+    OrderId:
+      name: order_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    VariantId:
+      name: variant_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: UUID, который клиент генерирует один раз на действие (нажатие кнопки). Повтор с тем же ключом не создаёт
+        дубль.
+      schema:
+        type: string
+        format: uuid
+      example: 6f1c2b7e-3d4a-4b8e-9f0a-1c2d3e4f5a6b
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID, который клиент генерирует один раз на нажатие «Оплатить». Без ключа — 422.
+      schema:
+        type: string
+        format: uuid
+      example: 0d5e3c4b-2a1f-4e6d-8c7b-9a0f1e2d3c4b
+    StatusFilter:
+      name: status
+      in: query
+      schema:
+        $ref: '#/components/schemas/OrderStatus'
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+  responses:
+    Unauthorized:
+      description: Нет токена, токен недействителен или истёк
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorOut'
+          example:
+            detail: Требуется вход
+    Forbidden:
+      description: Метод только для администратора (FR-16, NFR-04)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorOut'
+          example:
+            detail: Недостаточно прав
+    NotFound:
+      description: Не найдено или принадлежит другому пользователю
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorOut'
+          example:
+            detail: Не найдено
+    Conflict:
+      description: Действие противоречит текущему состоянию данных
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorOut'
+          example:
+            detail: 'Недостаточно товара: в наличии 2 шт.'
+    Unprocessable:
+      description: Ошибка в параметрах или теле запроса (формат FastAPI)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HTTPValidationError'
+tags:
+- name: service
+  description: Состояние сервера
+- name: catalog
+  description: Каталог, FR-03…FR-06
+- name: auth
+  description: Регистрация и вход, FR-01, FR-02
+- name: cart
+  description: Корзина, FR-07
+- name: orders
+  description: Заказы покупателя, FR-08, FR-10
+- name: payments
+  description: Оплата в тестовом режиме, FR-09, NFR-09
+- name: admin
+  description: Админка, FR-13…FR-16. Только роль admin

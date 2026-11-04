@@ -22,3 +22,15 @@ Thumbs.db
 .env.qa
 .pytest_cache/
 qa-results/
+
+# Резервные копии БД и фото (docs/stage3/ops-design.md): в них персональные данные
+backups/
+*.dump
+*.sql.gz
+
+# Git bundle для переноса веток и прочие локальные выгрузки
+*.bundle
+
+# Локальные файлы окружения кроме шаблона
+.env.*
+!.env.example

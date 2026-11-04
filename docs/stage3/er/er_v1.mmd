@@ -1,0 +1,100 @@
+erDiagram
+    CART_ITEMS {
+        bigint id PK
+        bigint user_id FK
+        bigint variant_id FK
+        int quantity
+        timestamptz added_at
+    }
+    CATEGORIES {
+        bigint id PK
+        varchar name UK
+        varchar slug UK
+    }
+    FAVORITES {
+        bigint user_id PK,FK
+        bigint product_id PK,FK
+        timestamptz added_at
+    }
+    ORDER_ITEMS {
+        bigint id PK
+        bigint order_id FK
+        bigint variant_id FK
+        int quantity
+        numeric price_at_purchase
+    }
+    ORDERS {
+        bigint id PK
+        bigint user_id FK
+        varchar status "new | paid | shipped | delivered | cancelled"
+        numeric total_amount
+        varchar delivery_method "courier | pickup"
+        varchar delivery_address
+        varchar contact_phone
+        timestamptz created_at
+    }
+    PAYMENTS {
+        bigint id PK
+        bigint order_id FK
+        varchar provider_payment_id UK
+        numeric amount
+        varchar status "pending | succeeded | cancelled"
+        timestamptz created_at
+        timestamptz paid_at
+    }
+    PRODUCT_IMAGES {
+        bigint id PK
+        bigint product_id FK
+        varchar storage_key
+        varchar color
+        smallint sort_order
+    }
+    PRODUCT_VARIANTS {
+        bigint id PK
+        bigint product_id FK
+        varchar size
+        varchar color
+        varchar sku UK
+        int stock
+    }
+    PRODUCTS {
+        bigint id PK
+        bigint category_id FK
+        varchar name
+        text description
+        varchar gender "men | women | unisex"
+        numeric price
+        boolean is_active
+        timestamptz created_at
+    }
+    REVIEWS {
+        bigint id PK
+        bigint user_id FK
+        bigint product_id FK
+        smallint rating
+        text body
+        timestamptz created_at
+    }
+    USERS {
+        bigint id PK
+        varchar email UK
+        varchar password_hash
+        varchar full_name
+        varchar phone
+        varchar role "customer | admin"
+        boolean is_active
+        timestamptz created_at
+    }
+    CATEGORIES ||--o{ PRODUCTS : "содержит"
+    PRODUCTS ||--|{ PRODUCT_VARIANTS : "размер и цвет"
+    PRODUCTS ||--o{ PRODUCT_IMAGES : "фото"
+    USERS ||--o{ CART_ITEMS : "корзина"
+    PRODUCT_VARIANTS ||--o{ CART_ITEMS : "в корзине"
+    USERS ||--o{ ORDERS : "оформляет"
+    USERS ||--o{ REVIEWS : "пишет"
+    PRODUCTS ||--o{ REVIEWS : "отзывы"
+    ORDERS ||--|{ ORDER_ITEMS : "состав"
+    PRODUCT_VARIANTS ||--o{ ORDER_ITEMS : "куплен"
+    ORDERS ||--o{ PAYMENTS : "оплата"
+    USERS ||--o{ FAVORITES : "избранное"
+    PRODUCTS ||--o{ FAVORITES : "в избранном"
