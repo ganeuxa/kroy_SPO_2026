@@ -155,6 +155,10 @@ docker compose -f docker-compose.test.yml down -v                 # остано
 | `restart` всего окружения | Данные (корзина) сохраняются | ✔ |
 | Ресурсы | | db 24 МБ, backend 64 МБ, nginx 11 МБ ОЗУ; образ nginx 74 МБ |
 
+## Этап III: проект
+
+Проект изменений БД, REST API (OpenAPI) и эксплуатации для этапа III: [docs/stage3](docs/stage3/README.md).
+
 ## API
 
 | Метод | Путь | Назначение | Коды |

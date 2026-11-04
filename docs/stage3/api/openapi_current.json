@@ -1,0 +1,1136 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Крой API",
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/api/health": {
+   "get": {
+    "tags": [
+     "service"
+    ],
+    "summary": "Health",
+    "description": "Жив ли сервер и есть ли связь с БД. Используется в healthcheck контейнера.",
+    "operationId": "health_api_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/products": {
+   "get": {
+    "tags": [
+     "catalog"
+    ],
+    "summary": "List Products",
+    "operationId": "list_products_api_products_get",
+    "parameters": [
+     {
+      "name": "gender",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "enum": [
+          "men",
+          "women",
+          "unisex"
+         ],
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Gender"
+      }
+     },
+     {
+      "name": "category",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 80
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "slug категории",
+       "title": "Category"
+      },
+      "description": "slug категории"
+     },
+     {
+      "name": "size",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 10
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Size"
+      }
+     },
+     {
+      "name": "color",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "maxLength": 40
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Color"
+      }
+     },
+     {
+      "name": "price_min",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0.0
+        },
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Price Min"
+      }
+     },
+     {
+      "name": "price_max",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number",
+         "minimum": 0.0
+        },
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Price Max"
+      }
+     },
+     {
+      "name": "q",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 1,
+         "maxLength": 100
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "поиск по названию",
+       "title": "Q"
+      },
+      "description": "поиск по названию"
+     },
+     {
+      "name": "sort",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "new",
+        "price_asc",
+        "price_desc"
+       ],
+       "type": "string",
+       "default": "new",
+       "title": "Sort"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 24,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProductList"
+        }
+       }
+      }
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorOut"
+        }
+       }
+      },
+      "description": "Unprocessable Content"
+     }
+    }
+   }
+  },
+  "/api/products/{product_id}": {
+   "get": {
+    "tags": [
+     "catalog"
+    ],
+    "summary": "Get Product",
+    "operationId": "get_product_api_products__product_id__get",
+    "parameters": [
+     {
+      "name": "product_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "minimum": 1,
+       "title": "Product Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProductDetail"
+        }
+       }
+      }
+     },
+     "404": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorOut"
+        }
+       }
+      },
+      "description": "Not Found"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/filters": {
+   "get": {
+    "tags": [
+     "catalog"
+    ],
+    "summary": "Get Filters",
+    "description": "Значения для фильтров каталога: берутся из видимых товаров.",
+    "operationId": "get_filters_api_filters_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Filters"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/register": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Register",
+    "operationId": "register_api_auth_register_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RegisterIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TokenOut"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Conflict",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/login": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Login",
+    "operationId": "login_api_auth_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LoginIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TokenOut"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/auth/me": {
+   "get": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Me",
+    "operationId": "me_api_auth_me_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserOut"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorOut"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/cart": {
+   "get": {
+    "tags": [
+     "cart"
+    ],
+    "summary": "Get Cart",
+    "operationId": "get_cart_api_cart_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CartOut"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorOut"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "tags": [
+     "cart"
+    ],
+    "summary": "Add To Cart",
+    "description": "Добавляет вариант товара в корзину. Если он уже там, увеличивает количество.",
+    "operationId": "add_to_cart_api_cart_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CartAddIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CartOut"
+        }
+       }
+      }
+     },
+     "401": {
+      "description": "Unauthorized",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorOut"
+        }
+       }
+      }
+     },
+     "404": {
+      "description": "Not Found",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorOut"
+        }
+       }
+      }
+     },
+     "409": {
+      "description": "Conflict",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ErrorOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "CartAddIn": {
+    "properties": {
+     "variant_id": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Variant Id"
+     },
+     "quantity": {
+      "type": "integer",
+      "maximum": 99.0,
+      "minimum": 1.0,
+      "title": "Quantity",
+      "default": 1
+     }
+    },
+    "type": "object",
+    "required": [
+     "variant_id"
+    ],
+    "title": "CartAddIn"
+   },
+   "CartItemOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "variant_id": {
+      "type": "integer",
+      "title": "Variant Id"
+     },
+     "product_id": {
+      "type": "integer",
+      "title": "Product Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "size": {
+      "type": "string",
+      "title": "Size"
+     },
+     "color": {
+      "type": "string",
+      "title": "Color"
+     },
+     "sku": {
+      "type": "string",
+      "title": "Sku"
+     },
+     "image_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Key"
+     },
+     "price": {
+      "type": "string",
+      "title": "Price"
+     },
+     "quantity": {
+      "type": "integer",
+      "title": "Quantity"
+     },
+     "stock": {
+      "type": "integer",
+      "title": "Stock"
+     },
+     "line_total": {
+      "type": "string",
+      "title": "Line Total"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "variant_id",
+     "product_id",
+     "name",
+     "size",
+     "color",
+     "sku",
+     "image_key",
+     "price",
+     "quantity",
+     "stock",
+     "line_total"
+    ],
+    "title": "CartItemOut"
+   },
+   "CartOut": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/CartItemOut"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "total_quantity": {
+      "type": "integer",
+      "title": "Total Quantity"
+     },
+     "total": {
+      "type": "string",
+      "title": "Total"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "total_quantity",
+     "total"
+    ],
+    "title": "CartOut"
+   },
+   "CategoryOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "slug": {
+      "type": "string",
+      "title": "Slug"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "slug"
+    ],
+    "title": "CategoryOut"
+   },
+   "ErrorOut": {
+    "properties": {
+     "detail": {
+      "type": "string",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "required": [
+     "detail"
+    ],
+    "title": "ErrorOut"
+   },
+   "Filters": {
+    "properties": {
+     "categories": {
+      "items": {
+       "$ref": "#/components/schemas/CategoryOut"
+      },
+      "type": "array",
+      "title": "Categories"
+     },
+     "sizes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Sizes"
+     },
+     "colors": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Colors"
+     },
+     "price_min": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price Min"
+     },
+     "price_max": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Price Max"
+     }
+    },
+    "type": "object",
+    "required": [
+     "categories",
+     "sizes",
+     "colors",
+     "price_min",
+     "price_max"
+    ],
+    "title": "Filters",
+    "description": "Значения для выпадающих списков фильтров каталога."
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "LoginIn": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "maxLength": 255,
+      "minLength": 3,
+      "title": "Email"
+     },
+     "password": {
+      "type": "string",
+      "maxLength": 72,
+      "minLength": 1,
+      "title": "Password"
+     }
+    },
+    "type": "object",
+    "required": [
+     "email",
+     "password"
+    ],
+    "title": "LoginIn"
+   },
+   "ProductDetail": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "price": {
+      "type": "string",
+      "title": "Price"
+     },
+     "gender": {
+      "type": "string",
+      "title": "Gender"
+     },
+     "category": {
+      "$ref": "#/components/schemas/CategoryOut"
+     },
+     "image_keys": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Image Keys"
+     },
+     "variants": {
+      "items": {
+       "$ref": "#/components/schemas/VariantOut"
+      },
+      "type": "array",
+      "title": "Variants"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "description",
+     "price",
+     "gender",
+     "category",
+     "image_keys",
+     "variants"
+    ],
+    "title": "ProductDetail"
+   },
+   "ProductList": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/ProductListItem"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "limit": {
+      "type": "integer",
+      "title": "Limit"
+     },
+     "offset": {
+      "type": "integer",
+      "title": "Offset"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "total",
+     "limit",
+     "offset"
+    ],
+    "title": "ProductList"
+   },
+   "ProductListItem": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "price": {
+      "type": "string",
+      "title": "Price"
+     },
+     "gender": {
+      "type": "string",
+      "title": "Gender"
+     },
+     "category": {
+      "$ref": "#/components/schemas/CategoryOut"
+     },
+     "image_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Image Key"
+     },
+     "in_stock": {
+      "type": "boolean",
+      "title": "In Stock"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "price",
+     "gender",
+     "category",
+     "image_key",
+     "in_stock"
+    ],
+    "title": "ProductListItem"
+   },
+   "RegisterIn": {
+    "properties": {
+     "email": {
+      "type": "string",
+      "maxLength": 255,
+      "format": "email",
+      "title": "Email"
+     },
+     "password": {
+      "type": "string",
+      "maxLength": 72,
+      "minLength": 8,
+      "title": "Password"
+     },
+     "full_name": {
+      "type": "string",
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Full Name"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^\\+?[0-9]{10,15}$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone",
+      "examples": [
+       "+79001112233"
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "email",
+     "password",
+     "full_name"
+    ],
+    "title": "RegisterIn"
+   },
+   "TokenOut": {
+    "properties": {
+     "access_token": {
+      "type": "string",
+      "title": "Access Token"
+     },
+     "token_type": {
+      "type": "string",
+      "title": "Token Type",
+      "default": "bearer"
+     },
+     "user": {
+      "$ref": "#/components/schemas/UserOut"
+     }
+    },
+    "type": "object",
+    "required": [
+     "access_token",
+     "user"
+    ],
+    "title": "TokenOut"
+   },
+   "UserOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "email": {
+      "type": "string",
+      "title": "Email"
+     },
+     "full_name": {
+      "type": "string",
+      "title": "Full Name"
+     },
+     "phone": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Phone"
+     },
+     "role": {
+      "type": "string",
+      "title": "Role"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "email",
+     "full_name",
+     "phone",
+     "role"
+    ],
+    "title": "UserOut"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   },
+   "VariantOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "size": {
+      "type": "string",
+      "title": "Size"
+     },
+     "color": {
+      "type": "string",
+      "title": "Color"
+     },
+     "sku": {
+      "type": "string",
+      "title": "Sku"
+     },
+     "stock": {
+      "type": "integer",
+      "title": "Stock"
+     },
+     "in_stock": {
+      "type": "boolean",
+      "title": "In Stock"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "size",
+     "color",
+     "sku",
+     "stock",
+     "in_stock"
+    ],
+    "title": "VariantOut"
+   }
+  },
+  "securitySchemes": {
+   "HTTPBearer": {
+    "type": "http",
+    "description": "Токен из /api/auth/login",
+    "scheme": "bearer"
+   }
+  }
+ }
+}
