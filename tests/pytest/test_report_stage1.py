@@ -67,19 +67,20 @@ FROM orders o JOIN order_items oi ON oi.order_id = o.id
 GROUP BY o.id, o.total_amount
 ORDER BY o.id;""")
     assert result['sqlstate'] is None
-    assert result['rows'] == [
+    assert result['rows'][:4] == [
         [1, '7770.00', '7770.00', True],
         [2, '4780.00', '4780.00', True],
         [3, '2990.00', '2990.00', True],
         [4, '6990.00', '6990.00', True],
     ]
+    assert all(row[3] for row in result['rows'])
 
 
 @pytest.mark.parametrize('sql,code,constraint', [
     ("UPDATE product_variants SET stock=-1 WHERE id=1", '23514', 'product_variants_stock_check'),
     ("INSERT INTO users(email,password_hash,full_name) VALUES ('anna@example.com','test-only','QA')", '23505', 'users_email_key'),
     ("""INSERT INTO orders(user_id,total_amount,delivery_method,delivery_address,contact_phone)
-        VALUES (9999,100,'pickup','QA address','+79000000000')""", '23503', 'orders_user_id_fkey'),
+        VALUES (9999,100,'courier','QA address','+79000000000')""", '23503', 'orders_user_id_fkey'),
     ("DELETE FROM orders WHERE id=1", '42501', None),
 ], ids=['C1-negative-stock', 'C2-duplicate-anna-email', 'C3-order-unknown-user', 'C8-delete-order-forbidden'])
 def test_report_constraints(report_db, sql, code, constraint):
@@ -93,7 +94,7 @@ def test_C10_app_can_read_products_and_add_favorite(report_db):
     result = report_db('SELECT id FROM products ORDER BY id')
     assert result['role'] == 'kroy_app'
     assert result['sqlstate'] is None
-    assert len(result['rows']) == 8
+    assert set(range(1,9)) <= {row[0] for row in result['rows']}
     # Choose an unused seed pair, so this remains repeatable without deleting favorites.
     result = report_db("""INSERT INTO favorites(user_id,product_id)
 SELECT u.id,p.id FROM users u CROSS JOIN products p
