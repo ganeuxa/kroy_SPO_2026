@@ -39,7 +39,8 @@ const DETAILS: Partial<Record<Kind, string>> = {
   jeans: "M30 22 H70 M50 12 V40 M34 22 Q36 32 44 30 M66 22 Q64 32 56 30",
 };
 
-export default function ProductImage({ name }: { name: string; imageKey?: string | null }) {
+export default function ProductImage({ name, imageUrl }: { name: string; imageKey?: string | null; imageUrl?: string | null }) {
+  if (imageUrl) return <div className="shot"><img src={imageUrl} alt={name} loading="lazy" /></div>;
   const h = hash(name);
   const kind = kindOf(name);
   const cloth = CLOTH[h % CLOTH.length];

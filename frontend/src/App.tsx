@@ -1,15 +1,32 @@
-import { Link, NavLink, Route, Routes } from "react-router-dom";
+import { ReactNode } from "react";
+import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import Catalog from "./pages/Catalog";
 import Product from "./pages/Product";
 import Placeholder from "./pages/Placeholder";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Cart from "./pages/Cart";
+import Checkout from "./pages/Checkout";
+import Orders from "./pages/Orders";
+import OrderDetail from "./pages/OrderDetail";
+import TestPayment from "./pages/TestPayment";
+import AdminProducts from "./pages/AdminProducts";
+import AdminProductDetail from "./pages/AdminProductDetail";
+import AdminOrders, { AdminOrderDetail } from "./pages/AdminOrders";
 import { useAuth } from "./auth";
 
 // Тема «домашняя страничка из 90-х» (в духе Geo для Bootstrap): звёздное небо, Comic Sans,
 // радужный логотип, яркие объёмные кнопки, «Under construction», счётчик и веб-кольцо.
 // Счётчик, веб-кольцо и «гостевая книга» — декорация, никуда не ведут.
+
+function AdminOnly({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  const location = useLocation();
+  if (loading) return <p className="status">Проверяем доступ…</p>;
+  if (!user) return <section className="placeholder"><h1>Нужен вход</h1><Link to={`/login?next=${encodeURIComponent(location.pathname)}`}>Войти</Link></section>;
+  if (user.role !== "admin") return <section className="placeholder"><h1>Недостаточно прав</h1><Link to="/">Вернуться в каталог</Link></section>;
+  return <>{children}</>;
+}
 
 export default function App() {
   const { user, loading, logout } = useAuth();
@@ -33,6 +50,8 @@ export default function App() {
           <NavLink to="/cart" className="btn btn-warning">
             Корзина
           </NavLink>
+          {user && <NavLink to="/account/orders" className="btn btn-primary">Мои заказы</NavLink>}
+          {user?.role === "admin" && <NavLink to="/admin/products" className="btn btn-info">Админка</NavLink>}
           {user ? (
             <button type="button" className="btn btn-default" onClick={logout} title={user.email}>
               Выйти ({user.full_name})
@@ -82,6 +101,14 @@ export default function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/cart" element={<Cart />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/account/orders" element={<Orders />} />
+            <Route path="/orders/:id" element={<OrderDetail />} />
+            <Route path="/pay/test/:providerId" element={<TestPayment />} />
+            <Route path="/admin/products" element={<AdminOnly><AdminProducts /></AdminOnly>} />
+            <Route path="/admin/products/:id" element={<AdminOnly><AdminProductDetail /></AdminOnly>} />
+            <Route path="/admin/orders" element={<AdminOnly><AdminOrders /></AdminOnly>} />
+            <Route path="/admin/orders/:id" element={<AdminOnly><AdminOrderDetail /></AdminOnly>} />
             <Route path="*" element={<Placeholder title="Страница не найдена" notFound />} />
           </Routes>
         </div>

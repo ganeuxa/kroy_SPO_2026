@@ -319,3 +319,33 @@ button, input, select { font: 14px "Comic Sans MS", "Comic Sans", cursive; color
   .marquee span { animation: none; padding-left: 0; }
   .blink { animation: none; }
 }
+
+/* Этап III: окна заказов и админки в существующей теме. */
+.shot img{display:block;width:100%;height:100%;object-fit:cover}
+.flow-page{text-align:left;max-width:1180px;margin:0 auto;padding:12px}
+.flow-page h1{font-size:clamp(25px,3vw,38px);margin:7px 0 18px;color:#000080}
+.flow-page h2{font-size:20px;color:#000080;margin:0 0 15px}
+.flow-page h3{margin:0;font-size:16px}
+.flow-page a:not(.primary):not(.back){color:#0000cc}
+.flow-page .back{display:inline-block;margin-bottom:10px}
+.flow-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,1fr);gap:20px;align-items:start}
+.flow-list{display:flex;flex-direction:column;gap:12px;min-width:0}
+.flow-panel{background:#f7f7ef;border:3px outset #fff;box-shadow:2px 2px 0 #555;padding:16px;min-width:0;color:#111}
+.flow-panel p{line-height:1.5}.flow-panel .muted,.muted{color:#555;font-size:13px}
+.flow-row{display:flex;justify-content:space-between;gap:15px;padding:10px 0;border-bottom:1px solid #aaa}.flow-row span{min-width:0}.flow-row b{white-space:nowrap}.flow-total{font-size:20px;border-bottom:0}
+.flow-page .form{display:flex;flex-direction:column;gap:13px}.flow-page .form label,.toolbar label{display:flex;flex-direction:column;gap:5px;font-weight:bold;font-size:13px}
+.flow-page input:not([type=radio]):not([type=checkbox]):not([type=file]),.flow-page select,.flow-page textarea{width:100%;padding:9px;border:2px inset #ddd;background:#fff;color:#111;font:inherit}
+.flow-page input[type=file]{max-width:100%}.flow-page textarea{min-height:85px;resize:vertical}
+.flow-page fieldset{border:2px solid #aaa;display:flex;gap:20px;flex-wrap:wrap}.flow-page fieldset label{display:flex!important;flex-direction:row!important;align-items:center;gap:5px}.flow-page fieldset input{margin:0}
+.flow-page .primary{display:inline-block;align-self:flex-start;text-align:center;text-decoration:none;padding:10px 17px;border:2px outset #90b3ff;background:#0055ff;color:white;font-weight:bold;cursor:pointer}
+.flow-page .primary:disabled,.flow-page button:disabled{opacity:.5;cursor:not-allowed}
+.flow-page button:not(.primary):not(.link-button){padding:8px 12px;border:2px outset #fff;background:#ddd;color:#111;cursor:pointer}
+.flow-page button:not(.primary):not(.link-button):disabled{cursor:not-allowed}
+.flow-page .link-button{color:#a00;text-decoration:underline;border:0;background:none;cursor:pointer}
+.flow-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}.flow-heading h1{margin-bottom:12px}
+.status-pill{display:inline-block;padding:5px 8px;background:#ddd;border:1px solid #777;font-size:12px;font-weight:bold}.status-pill--new{background:#fff0ad}.status-pill--paid{background:#caf5c4}.status-pill--shipped{background:#c9e5ff}.status-pill--delivered{background:#b9efd2}.status-pill--cancelled{background:#efc8c8}
+.order-card{display:flex;justify-content:space-between;align-items:center;gap:15px;text-decoration:none;color:#111!important}.order-card>div{display:flex;flex-direction:column;gap:4px}.order-card strong{white-space:nowrap}.order-card:hover{background:#e9f2ff}
+.toolbar,.actions{display:flex;align-items:end;gap:10px;flex-wrap:wrap}.toolbar label{min-width:120px;flex:1}.actions{margin:12px 0}.quantity{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:5px}.quantity button{min-width:30px;padding:3px 7px;border:2px outset #fff;background:#ddd}.cart__summary .primary{display:inline-block;padding:9px 15px;background:#0055ff;color:#fff;text-decoration:none;border:2px outset #fff}
+.variant-panel{margin-bottom:10px}.history-list{max-height:180px;overflow:auto;border-top:1px solid #bbb}.history-list p{margin:7px 0}.image-row{display:grid;grid-template-columns:100px 1fr;gap:15px}.image-row>img{width:100px;height:100px;object-fit:cover}.inline-check{display:flex!important;flex-direction:row!important;align-items:center}.inline-check input{width:auto!important}.payment-page{max-width:640px}.payment-page .actions button{min-width:120px}
+@media(max-width:760px){.flow-layout{grid-template-columns:1fr}.flow-page{padding:6px}.flow-panel{padding:12px}.order-card{align-items:flex-start;flex-wrap:wrap}.toolbar label{min-width:calc(50% - 10px)}.cart__item{align-items:start}}
+@media(max-width:420px){.toolbar label{min-width:100%}.flow-row{font-size:13px}.image-row{grid-template-columns:70px 1fr}.image-row>img{width:70px;height:70px}}
