@@ -27,21 +27,22 @@ def pytest_collection_modifyitems(config, items):
 
 
 class Client:
-    def request(self, path, data=None, token=None):
+    def request(self, path, data=None, token=None, method=None, extra_headers=None):
         headers = {'Content-Type': 'application/json'}
         if token:
             headers['Authorization'] = 'Bearer ' + token
         request = Request(BASE_URL + path,
                           data=json.dumps(data).encode() if data is not None else None,
-                          headers=headers)
+                          headers={**headers, **(extra_headers or {})}, method=method)
         try:
             with urlopen(request, timeout=20) as response:
-                return response.status, json.load(response)
+                raw = response.read()
+                return response.status, json.loads(raw) if raw else None
         except HTTPError as error:
             return error.code, json.loads(error.read())
 
-    def expect(self, path, status=200, data=None, token=None):
-        actual, body = self.request(path, data, token)
+    def expect(self, path, status=200, data=None, token=None, **kwargs):
+        actual, body = self.request(path, data, token, **kwargs)
         # Do not include authentication response bodies (tokens) in assertion output.
         assert actual == status, f'{path}: HTTP {actual}, expected {status}'
         return body
