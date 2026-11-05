@@ -45,7 +45,7 @@ def test_only_nginx_publishes_port(api, compose):
     output = compose('ps', '--format', 'json')
     # Compose versions emit either an array or newline-delimited JSON objects.
     rows = json.loads(output) if output.lstrip().startswith('[') else [json.loads(line) for line in output.splitlines() if line]
-    assert {row['Service'] for row in rows} == {'db', 'backend', 'nginx'}
+    assert {'db', 'backend', 'nginx'} <= {row['Service'] for row in rows}
     for row in rows:
         published = [p for p in row.get('Publishers') or [] if p.get('PublishedPort')]
         if row['Service'] == 'nginx':

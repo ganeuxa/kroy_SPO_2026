@@ -1,0 +1,18 @@
+# Overlay for docker-compose.test.yml. Backend AND storage must be stopped
+# before snapshotting the raw SeaweedFS volume.
+services:
+  backup:
+    image: postgres:16-alpine
+    profiles: [ops]
+    entrypoint: [sh, /ops/backup.sh]
+    environment:
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      RELEASE_REVISION: ${RELEASE_REVISION:-unknown}
+    volumes:
+      - ./ops:/ops:ro
+      - ./backups:/backups
+      - media_test:/media:ro
+    networks: [back]
+    restart: "no"
