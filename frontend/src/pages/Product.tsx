@@ -84,7 +84,7 @@ export default function Product() {
         ← Каталог
       </Link>
       <div className="product__layout">
-        <ProductImage name={product.name} imageKey={product.image_keys[0]} />
+        <ProductImage name={product.name} imageKey={product.image_keys[0]} imageUrl={product.image_urls?.[0]} />
 
         <div className="product__info">
           <span className="card__meta">

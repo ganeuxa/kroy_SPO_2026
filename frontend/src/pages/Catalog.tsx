@@ -178,7 +178,7 @@ export default function Catalog() {
             {data.items.map((p) => (
               <li key={p.id} className="card">
                 <Link to={`/products/${p.id}`}>
-                  <ProductImage name={p.name} imageKey={p.image_key} />
+                  <ProductImage name={p.name} imageKey={p.image_key} imageUrl={p.image_url} />
                   <div className="card__body">
                     <span className="card__name">{p.name}</span>
                     <span className="card__meta">
