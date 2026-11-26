@@ -1,6 +1,7 @@
 import base64
 import json
 import uuid
+import time
 from datetime import datetime, timezone
 import pytest
 
@@ -36,13 +37,19 @@ finally:c.remove_object(b,k)
     assert json.loads(result)['match']
 
 def test_logs_do_not_contain_canary_secrets(api,compose):
-    start=datetime.now(timezone.utc).isoformat()
+    # Docker VM and Windows host clocks can differ. Use the log producer's clock.
+    start=compose('exec','-T','backend','python','-c',
+        'from datetime import datetime, timezone; print(datetime.now(timezone.utc).isoformat())').strip()
     unique=uuid.uuid4().hex
     email=f'qa-log-{unique}@example.com';password='Secret-'+unique
     phone='+79991239876';name='QA-log-'+unique
     response=api.expect('/api/auth/register',201,{'email':email,'password':password,'full_name':name,'phone':phone})
     api.expect('/api/auth/me',token=response['access_token'])
-    logs=compose('logs','--since',start,'backend','nginx')
+    for attempt in range(10):
+        logs=compose('logs','--since',start,'backend','nginx')
+        if '/api/auth/register' in logs and '/api/auth/me' in logs:
+            break
+        time.sleep(0.2)
     for value in [email,password,phone,name,response['access_token']]:
         assert value not in logs,'Sensitive canary value found in logs (value redacted)'
     assert '/api/auth/register' in logs and '/api/auth/me' in logs

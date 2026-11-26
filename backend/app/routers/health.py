@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 
 from app.db import get_db
 
@@ -12,7 +13,12 @@ router = APIRouter(tags=["service"])
 log = logging.getLogger("kroy.health")
 
 
-@router.get("/health")
+class HealthOut(BaseModel):
+    status: str
+    db: str
+
+
+@router.get("/health", response_model=HealthOut, responses={503: {"model": HealthOut}})
 def health(db: Session = Depends(get_db)):
     """Жив ли сервер и есть ли связь с БД. Используется в healthcheck контейнера."""
     try:

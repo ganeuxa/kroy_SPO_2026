@@ -147,6 +147,10 @@ export function getFilters(): Promise<Filters> {
   return request<Filters>("/filters");
 }
 
+export function logout(): Promise<void> {
+  return request<void>("/auth/logout", "POST");
+}
+
 // --- Вход и регистрация (FR-01, FR-02) ---
 
 export interface User {
