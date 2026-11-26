@@ -12,14 +12,20 @@ export default function Orders() {
   const [data, setData] = useState<Page<OrderSummary> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
     if (!user) return;
+    let current = true;
     setLoading(true); setError(null);
-    getOrders({ status: status || undefined, limit: 10, offset: (page - 1) * 10 }).then(setData).catch((e) => setError(errorText(e))).finally(() => setLoading(false));
-  }, [user, status, page]);
+    getOrders({ status: status || undefined, limit: 10, offset: (page - 1) * 10 })
+      .then((result) => { if (current) setData(result); })
+      .catch((e) => { if (current) setError(errorText(e)); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [user, status, page, retry]);
   if (authLoading) return <p className="status">Загрузка…</p>;
   if (!user) return <section className="placeholder"><h1>Мои заказы</h1><Link to="/login?next=/account/orders">Войти</Link></section>;
   return <section className="flow-page"><h1>Мои заказы</h1><div className="toolbar"><label>Статус <select value={status} onChange={(e) => setParams(e.target.value ? { status: e.target.value } : {})}><option value="">Все заказы</option>{(Object.keys(ORDER_STATUS) as OrderStatus[]).map((s) => <option key={s} value={s}>{ORDER_STATUS[s]}</option>)}</select></label></div>
-    {loading ? <p className="status">Загружаем заказы…</p> : error ? <div className="flow-panel"><p className="status--error" role="alert">{error}</p><button className="primary" onClick={() => setParams(new URLSearchParams(params))}>Повторить</button></div> : !data?.items.length ? <div className="placeholder"><h2>Заказов пока нет</h2><Link to="/">Открыть каталог</Link></div> : <><div className="flow-list">{data.items.map((order) => <Link className="flow-panel order-card" key={order.id} to={`/orders/${order.id}`}><div><b>Заказ №{order.id}</b><span className="muted">{dateTime(order.created_at)} · {order.items_count} товаров</span></div><span className={`status-pill status-pill--${order.status}`}>{ORDER_STATUS[order.status]}</span><strong>{formatPrice(order.total_amount)}</strong></Link>)}</div><div className="pager"><button disabled={page <= 1} onClick={() => setParams(status ? { status, page: String(page - 1) } : { page: String(page - 1) })}>Назад</button><span>Страница {page}</span><button disabled={page * 10 >= data.total} onClick={() => setParams(status ? { status, page: String(page + 1) } : { page: String(page + 1) })}>Далее</button></div></>}
+    {loading ? <p className="status">Загружаем заказы…</p> : error ? <div className="flow-panel"><p className="status--error" role="alert">{error}</p><button className="primary" onClick={() => setRetry((n) => n + 1)}>Повторить</button></div> : !data?.items.length ? <div className="placeholder"><h2>Заказов пока нет</h2><Link to="/">Открыть каталог</Link></div> : <><div className="flow-list">{data.items.map((order) => <Link className="flow-panel order-card" key={order.id} to={`/orders/${order.id}`}><div><b>Заказ №{order.id}</b><span className="muted">{dateTime(order.created_at)} · {order.items_count} товаров</span></div><span className={`status-pill status-pill--${order.status}`}>{ORDER_STATUS[order.status]}</span><strong>{formatPrice(order.total_amount)}</strong></Link>)}</div><div className="pager"><button disabled={page <= 1} onClick={() => setParams(status ? { status, page: String(page - 1) } : { page: String(page - 1) })}>Назад</button><span>Страница {page}</span><button disabled={page * 10 >= data.total} onClick={() => setParams(status ? { status, page: String(page + 1) } : { page: String(page + 1) })}>Далее</button></div></>}
   </section>;
 }

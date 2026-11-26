@@ -32,6 +32,7 @@ export default function Catalog() {
   }, []);
 
   useEffect(() => {
+    let current = true;
     setSearch(params.get("q") ?? "");
     const query: Record<string, string> = {};
     for (const key of FILTER_KEYS) {
@@ -41,9 +42,12 @@ export default function Catalog() {
     setLoading(true);
     setError(null);
     getProducts({ ...query, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE })
-      .then(setData)
-      .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Не удалось загрузить каталог"))
-      .finally(() => setLoading(false));
+      .then((result) => { if (current) setData(result); })
+      .catch((e: unknown) => {
+        if (current) setError(e instanceof ApiError ? e.message : "Не удалось загрузить каталог");
+      })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
   }, [params, page, retry]);
 
   function update(key: string, value: string) {
@@ -156,7 +160,7 @@ export default function Catalog() {
 
       <section className="results">
         <div className="results__bar">
-          <span>{data ? `${params.get("q") ? `По запросу «${params.get("q")}» · ` : ""}Найдено: ${data.total}` : " "}</span>
+          <span>{!loading && !error && data ? `${params.get("q") ? `По запросу «${params.get("q")}» · ` : ""}Найдено: ${data.total}` : " "}</span>
           <select value={params.get("sort") ?? "new"} onChange={(e) => update("sort", e.target.value)}>
             <option value="new">Сначала новые</option>
             <option value="price_asc">Сначала дешевле</option>
@@ -195,7 +199,7 @@ export default function Catalog() {
           </ul>
         )}
 
-        {pages > 1 && (
+        {!loading && !error && pages > 1 && (
           <nav className="pager">
             {Array.from({ length: pages }, (_, i) => i + 1).map((n) => (
               <button
