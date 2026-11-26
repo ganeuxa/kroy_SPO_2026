@@ -95,14 +95,6 @@ node tests/ux_checkout.cjs
 
 `QA_URL` по умолчанию указывает на `http://127.0.0.1:5173`. Для проверки администратора задать `QA_ADMIN_EMAIL` и `QA_ADMIN_PASSWORD` от учебной учётной записи. Для парных снимков задать `QA_BASELINE_URL` с адресом локальной сборки `fe6459b` и `QA_SCREENSHOTS` с каталогом вывода. Обе сборки используют одну учебную базу.
 
-## Скриншоты и сдача
+## Отчёт со скриншотами
 
-Сравнение снято в Edge на одной ширине и с одинаковыми ответами API для обеих сборок. «До» соответствует `fe6459b`, «после» соответствует рабочей ветке.
-
-| Экран | До | После |
-|---|---|---|
-| Ошибка каталога | [Кадр](varvara-ux-screenshots/catalog-before.png) | [Кадр](varvara-ux-screenshots/catalog-after.png) |
-| Корзина при недостаточном остатке | [Кадр](varvara-ux-screenshots/cart-before.png) | [Кадр](varvara-ux-screenshots/cart-after.png) |
-| Оформление без пунктов самовывоза | [Кадр](varvara-ux-screenshots/checkout-before.png) | [Кадр](varvara-ux-screenshots/checkout-after.png) |
-
-Снимки мобильных окон в Edge: [каталог на 360 px](varvara-ux-screenshots/catalog-mobile-after.png), [отменённый заказ на 390 px](varvara-ux-screenshots/order-cancelled-mobile.png).
+В отдельном PDF «Крой — отчёт по проверке интерфейса» собраны пары «до/после» для каталога, корзины и оформления, а также два мобильных снимка. Снимки каждой пары сделаны в Edge на одной ширине и с одинаковыми ответами API. Кадры «до» соответствуют `fe6459b`, кадры «после» — `807218b`.
