@@ -93,13 +93,15 @@ jobs:
           set -euo pipefail
           project=kroy-varvara-nginx-qa
           backend=$(docker compose -f docker-compose.test.yml --env-file .env.qa -p "$project" ps -q backend)
-          docker cp tests/benchmark_catalog.py "$backend:/tmp/benchmark_catalog.py"
+          # docker cp writes through the container rootfs and fails for this read-only service.
+          # Stream files into the writable /tmp tmpfs instead.
+          docker exec -i --user kroy "$backend" sh -c 'cat > /tmp/benchmark_catalog.py' < tests/benchmark_catalog.py
 
           # Commit immediately before backend PR #13 introduced the catalog query optimization.
           baseline_ref=902edb3
           git cat-file -e "$baseline_ref:backend/app/routers/products.py"
           git show "$baseline_ref:backend/app/routers/products.py" > /tmp/products-before.py
-          docker cp /tmp/products-before.py "$backend:/tmp/products-before.py"
+          docker exec -i --user kroy "$backend" sh -c 'cat > /tmp/products-before.py' < /tmp/products-before.py
           docker exec --user kroy -e BENCH_PRODUCTS_FILE=/tmp/products-before.py "$backend" python /tmp/benchmark_catalog.py before > qa-results/catalog-before.json
           docker exec --user kroy "$backend" python /tmp/benchmark_catalog.py after > qa-results/catalog-after.json
           python ops/compare-benchmark.py qa-results/catalog-before.json qa-results/catalog-after.json --output-dir qa-results
