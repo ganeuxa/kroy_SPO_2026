@@ -23,7 +23,7 @@ export default function Cart() {
   }
 
   if (loading) return <p className="status">Загрузка…</p>;
-  if (!user) return <section className="placeholder"><h1>Корзина</h1><p>Войдите, чтобы пользоваться корзиной.</p><Link to="/login?next=/cart">Войти</Link></section>;
+  if (!user) return <section className="placeholder"><h1>Корзина</h1><p>Войдите или создайте аккаунт, чтобы добавлять товары и оформлять заказы.</p><div className="actions"><Link className="primary" to="/login?next=/cart">Войти</Link><Link to="/register?next=/cart">Создать аккаунт</Link></div><p>После входа или регистрации вы вернётесь в корзину.</p></section>;
   if (!cart && error) return <section className="placeholder"><p className="status--error">{error}</p><button className="primary" onClick={() => { setError(null); getCart().then(setCart).catch((e) => setError(e.message)); }}>Повторить</button></section>;
   if (!cart) return <p className="status">Загружаем корзину…</p>;
   if (cart.items.length === 0) return <section className="placeholder"><h1>Корзина пуста</h1><Link to="/">Перейти в каталог</Link></section>;

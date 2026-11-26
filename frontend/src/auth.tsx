@@ -8,7 +8,7 @@ interface AuthState {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: api.RegisterData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -39,7 +39,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     login: async (email, password) => accept(await api.login(email, password)),
     register: async (data) => accept(await api.register(data)),
-    logout: () => {
+    logout: async () => {
+      try {
+        await api.logout();
+      } catch (e: unknown) {
+        // Already expired/revoked is a successful local logout. Other errors must be visible.
+        if (!(e instanceof api.ApiError && e.status === 401)) throw e;
+      }
       api.setToken(null);
       setUser(null);
     },

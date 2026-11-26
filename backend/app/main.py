@@ -5,11 +5,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.openapi.utils import get_openapi
 from sqlalchemy.exc import InterfaceError, OperationalError
 
 from app.config import settings
 from app.db import SessionLocal
 from app.order_service import expire_orders
+from app.schemas import ErrorOut
 from app.routers import admin, admin_images, auth, cart, health, orders, payments, products
 
 logging.basicConfig(
@@ -46,10 +48,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Крой API",
-    version="0.1.0",
+    version="0.4.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
+    responses={503: {"model": ErrorOut, "description": "База данных недоступна"}},
 )
 
 app.include_router(health.router, prefix="/api")
@@ -60,6 +63,34 @@ app.include_router(orders.router, prefix="/api")
 app.include_router(payments.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(admin_images.router, prefix="/api")
+
+
+def openapi_schema():
+    """Document shared auth errors and both real shapes of validation errors."""
+    if app.openapi_schema is None:
+        schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+        for path, operations in schema["paths"].items():
+            for operation in operations.values():
+                if not isinstance(operation, dict) or "responses" not in operation:
+                    continue
+                responses = operation["responses"]
+                if operation.get("security"):
+                    responses.setdefault("401", {"description": "Требуется действующий токен",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorOut"}}}})
+                if path.startswith("/api/admin/"):
+                    responses.setdefault("403", {"description": "Недостаточно прав",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorOut"}}}})
+                if "422" in responses:
+                    responses["422"] = {"description": "Ошибка полей или бизнес-валидации",
+                        "content": {"application/json": {"schema": {"anyOf": [
+                            {"$ref": "#/components/schemas/HTTPValidationError"},
+                            {"$ref": "#/components/schemas/ErrorOut"},
+                        ]}}}}
+        app.openapi_schema = schema
+    return app.openapi_schema
+
+
+app.openapi = openapi_schema
 
 
 @app.middleware("http")

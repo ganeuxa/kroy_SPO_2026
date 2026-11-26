@@ -76,7 +76,7 @@ def account(api, user_data):
 def compose():
     def run(*args, input=None):
         result = subprocess.run(COMPOSE + list(args), cwd=ROOT, input=input,
-                                text=True, capture_output=True, timeout=120)
+                                text=True, encoding='utf-8', capture_output=True, timeout=120)
         assert result.returncode == 0, f'Compose command failed: {args}; {result.stderr}'
         return result.stdout
     return run

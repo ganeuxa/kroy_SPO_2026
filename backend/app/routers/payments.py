@@ -9,30 +9,20 @@ import logging
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Response
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import get_db
 from app.models import Order, Payment, User
-from app.order_service import cancel_order, change_status, get_order, is_expired, payment_out
+from app.order_service import cancel_order, get_order, is_expired, payment_out
 from app.schemas import ErrorOut, PaymentOut, TestProviderResultIn
 from app.security import get_current_user
+from app.payment_service import EXPIRED, not_payable, process_notification
 
 router = APIRouter(tags=["payments"])
 log = logging.getLogger("kroy.payments")
-
-EXPIRED = "Срок оплаты истёк, заказ отменён"
-
-
-def _not_payable(order: Order) -> str | None:
-    if order.status == "cancelled":
-        return EXPIRED if order.cancel_reason == "expired" else "Заказ отменён"
-    if order.status != "new":
-        return "Заказ уже оплачен"
-    return None
-
 
 def _payment_by_key(db: Session, order_id: int, key: UUID) -> Payment | None:
     return db.scalar(
@@ -68,7 +58,7 @@ def create_payment(
         cancel_order(db, order, "expired", changed_by=None, comment="Не оплачен вовремя")
         db.commit()
         raise HTTPException(status_code=409, detail=EXPIRED)
-    reason = _not_payable(order)
+    reason = not_payable(order)
     if reason:
         raise HTTPException(status_code=409, detail=reason)
 
@@ -126,37 +116,4 @@ def test_provider_complete(
     if settings.payment_provider != "test":
         raise HTTPException(status_code=404, detail="Не найдено")
 
-    found = db.scalar(select(Payment).where(Payment.provider_payment_id == str(provider_payment_id)))
-    if found is None:
-        raise HTTPException(status_code=404, detail="Платёж не найден")
-    # Порядок блокировок как у остальных: сначала заказ, потом платёж
-    order = get_order(db, found.order_id, lock=True)
-    payment = db.scalar(select(Payment).where(Payment.id == found.id).with_for_update())
-
-    if payment.status != "pending":
-        return payment_out(payment)
-
-    if data.result == "failed":
-        payment.status = "failed"
-        payment.failure_reason = data.failure_reason or "Платёж отклонён"
-        db.commit()
-        log.info("Платёж %s отклонён, заказ %s ждёт новой попытки", payment.id, order.id)
-        return payment_out(payment)
-
-    if is_expired(order):
-        cancel_order(db, order, "expired", changed_by=None, comment="Не оплачен вовремя")
-        db.commit()
-        raise HTTPException(status_code=409, detail=EXPIRED)
-    reason = _not_payable(order)
-    if reason:
-        payment.status = "cancelled"
-        db.commit()
-        raise HTTPException(status_code=409, detail=reason)
-
-    payment.status = "succeeded"
-    payment.paid_at = func.now()
-    change_status(db, order, "paid", changed_by=None, comment=f"Платёж №{payment.id}")
-    db.commit()
-    db.refresh(payment)
-    log.info("Платёж %s успешен, заказ %s оплачен", payment.id, order.id)
-    return payment_out(payment)
+    return process_notification(data, provider_payment_id, db)

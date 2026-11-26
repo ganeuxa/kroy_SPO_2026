@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { Link, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import Catalog from "./pages/Catalog";
 import Product from "./pages/Product";
@@ -30,6 +30,15 @@ function AdminOnly({ children }: { children: ReactNode }) {
 
 export default function App() {
   const { user, loading, logout } = useAuth();
+  const [logoutError, setLogoutError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
+  async function handleLogout() {
+    setLoggingOut(true);
+    setLogoutError("");
+    try { await logout(); }
+    catch { setLogoutError("Не удалось завершить сеансы на сервере. Повторите выход."); }
+    finally { setLoggingOut(false); }
+  }
 
   return (
     <div className="page">
@@ -53,7 +62,7 @@ export default function App() {
           {user && <NavLink to="/account/orders" className="btn btn-primary">Мои заказы</NavLink>}
           {user?.role === "admin" && <NavLink to="/admin/products" className="btn btn-info">Админка</NavLink>}
           {user ? (
-            <button type="button" className="btn btn-default" onClick={logout} title={user.email}>
+            <button type="button" className="btn btn-default" onClick={handleLogout} disabled={loggingOut} title="Завершить все сеансы на всех устройствах">
               Выйти ({user.full_name})
             </button>
           ) : (
@@ -65,6 +74,7 @@ export default function App() {
           )}
         </div>
       </nav>
+      {logoutError && <p role="alert" className="status">{logoutError}</p>}
 
       <header className="hero">
         <Link to="/" className="rainbow" aria-label="Крой, на главную">
@@ -80,8 +90,8 @@ export default function App() {
 
       <div className="marquee" aria-hidden="true">
         <span>
-          ☆ Новые поступления каждую неделю! ☆ Доставка по всей России!!! ☆ Зарегистрируйся и получи
-          скидку! ☆ Добавь нас в Избранное! ☆
+          ☆ Учебный магазин «Крой» ☆ Выберите размер и цвет в карточке товара ☆
+          Оплата тестовая — деньги не списываются ☆
         </span>
       </div>
 
@@ -136,7 +146,7 @@ export default function App() {
         <p>
           © 1998–2026 «Крой» · Учебный проект РТУ МИРЭА · Вебмастер: Angel20071337RUSkiller
           <br />
-          Не забудьте подписать гостевую книгу!!!
+          Заказы и оплата используются для учебной демонстрации.
         </p>
       </footer>
     </div>

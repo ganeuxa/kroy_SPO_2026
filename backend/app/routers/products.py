@@ -8,7 +8,7 @@ from sqlalchemy import Select, exists, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.models import Category, Product, ProductVariant
+from app.models import Category, Product, ProductImage, ProductVariant
 from app.order_service import media_url
 from app.schemas import (
     CategoryOut,
@@ -108,27 +108,31 @@ def list_products(
         "price_asc": (Product.price.asc(), Product.id.asc()),
         "price_desc": (Product.price.desc(), Product.id.desc()),
     }[sort]
-    stmt = (
-        _apply_filters(select(Product), *args)
-        .options(selectinload(Product.variants), selectinload(Product.images))
-        .order_by(*order)
-        .limit(limit)
-        .offset(offset)
+    first_image = (
+        select(ProductImage.storage_key)
+        .where(ProductImage.product_id == Product.id)
+        .order_by(ProductImage.sort_order, ProductImage.id).limit(1).scalar_subquery()
     )
-    products = db.scalars(stmt).unique().all()
-
+    available = exists().where(
+        ProductVariant.product_id == Product.id,
+        ProductVariant.is_active, ProductVariant.stock > 0,
+    )
+    stmt = (
+        _apply_filters(select(
+            Product.id, Product.name, Product.price, Product.gender,
+            Category.id.label("category_id"), Category.name.label("category_name"),
+            Category.slug.label("category_slug"), first_image.label("image_key"),
+            available.label("in_stock"),
+        ).join(Category, Category.id == Product.category_id), *args)
+        .order_by(*order).limit(limit).offset(offset)
+    )
     items = [
         ProductListItem(
-            id=p.id,
-            name=p.name,
-            price=p.price,
-            gender=p.gender,
-            category=CategoryOut.model_validate(p.category),
-            image_key=p.images[0].storage_key if p.images else None,
-            image_url=media_url(p.images[0].storage_key) if p.images else None,
-            in_stock=any(v.is_active and v.stock > 0 for v in p.variants),
+            id=row.id, name=row.name, price=row.price, gender=row.gender,
+            category=CategoryOut(id=row.category_id, name=row.category_name, slug=row.category_slug),
+            image_key=row.image_key, image_url=media_url(row.image_key), in_stock=row.in_stock,
         )
-        for p in products
+        for row in db.execute(stmt)
     ]
     return ProductList(items=items, total=total, limit=limit, offset=offset)
 

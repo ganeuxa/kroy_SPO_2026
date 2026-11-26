@@ -2,8 +2,8 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Response
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -52,7 +52,8 @@ def register(data: RegisterIn, db: Session = Depends(get_db)) -> TokenOut:
     return TokenOut(access_token=create_access_token(user), user=UserOut.model_validate(user))
 
 
-@router.post("/login", response_model=TokenOut, responses={401: {"model": ErrorOut}})
+@router.post("/login", response_model=TokenOut,
+    responses={401: {"model": ErrorOut}, 403: {"model": ErrorOut}})
 def login(data: LoginIn, db: Session = Depends(get_db)) -> TokenOut:
     user = _find_by_email(db, data.email)
     # Одно сообщение для «нет такого email» и «неверный пароль»,
@@ -67,3 +68,13 @@ def login(data: LoginIn, db: Session = Depends(get_db)) -> TokenOut:
 @router.get("/me", response_model=UserOut, responses={401: {"model": ErrorOut}})
 def me(user: User = Depends(get_current_user)) -> User:
     return user
+
+
+@router.post("/logout", status_code=204, response_class=Response,
+    responses={401: {"model": ErrorOut}},
+    summary="Завершить все сеансы пользователя")
+def logout(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> Response:
+    """Отзывает все ранее выданные токены. Повтор со старым токеном возвращает 401."""
+    db.execute(update(User).where(User.id == user.id).values(auth_version=User.auth_version + 1))
+    db.commit()
+    return Response(status_code=204)

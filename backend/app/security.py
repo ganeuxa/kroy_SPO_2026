@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
+from uuid import uuid4
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -41,6 +42,8 @@ def create_access_token(user: User) -> str:
     payload = {
         "sub": str(user.id),
         "role": user.role,
+        "ver": user.auth_version,
+        "jti": str(uuid4()),
         "iat": now,
         "exp": now + timedelta(minutes=settings.jwt_expire_minutes),
     }
@@ -66,14 +69,20 @@ def get_current_user(
             options={"require": ["sub", "exp"]},
         )
         user_id = int(payload["sub"])
+        version = payload.get("ver", 0)
+        if not 0 < user_id < 2**63 or type(version) is not int or version < 0:
+            raise ValueError("Invalid subject or token version")
     except jwt.ExpiredSignatureError:
         raise _unauthorized("Срок действия входа истёк, войдите снова")
-    except (jwt.InvalidTokenError, ValueError):
+    except (jwt.InvalidTokenError, ValueError, TypeError) as exc:
+        log.warning("Токен отклонён: %s", type(exc).__name__)
         raise _unauthorized("Недействительный токен")
 
     user = db.get(User, user_id)
     if user is None or not user.is_active:
         raise _unauthorized("Пользователь не найден или заблокирован")
+    if user.auth_version != version:
+        raise _unauthorized("Вход завершён, войдите снова")
     return user
 
 
