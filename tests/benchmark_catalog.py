@@ -4,14 +4,26 @@ Creates 1000 synthetic products only in a disposable QA database. Never run on p
 Uses the real route function with a fresh Session per request; excludes HTTP/network overhead.
 """
 import hashlib
+import importlib.util
 import json
+import os
 import statistics
 import sys
 import time
 
 from sqlalchemy import event, text
 from app.db import engine, SessionLocal
-from app.routers.products import list_products
+
+route_file = os.getenv("BENCH_PRODUCTS_FILE")
+if route_file:
+    spec = importlib.util.spec_from_file_location("app.routers._benchmark_products", route_file)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load benchmark route module: {route_file}")
+    route = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(route)
+    list_products = route.list_products
+else:
+    from app.routers.products import list_products
 
 with engine.begin() as c:
     if not c.scalar(text("SELECT count(*) FROM products WHERE name LIKE 'BENCH-IV-%'")):

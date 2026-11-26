@@ -2,9 +2,9 @@
 openapi: 3.1.0
 info:
   title: Крой API
-  version: 0.3.0
-  description: 'Интернет-магазин одежды «Крой». Версия этапа III: корзина целиком (FR-07), заказы (FR-08, FR-10), тестовая
-    оплата (FR-09) и админка (FR-13…FR-16).
+  version: 0.4.0
+  description: 'Актуальный контракт FastAPI для учебного интернет-магазина одежды «Крой». Схема собирается из runtime API;
+    stage3-paths.yaml добавляет русские пояснения.
 
 
     Общие правила: ошибки — `{"detail": "..."}`, ошибки валидации (422) — формат FastAPI; суммы — строки с двумя знаками;
@@ -15,7 +15,7 @@ paths:
     get:
       tags:
       - service
-      summary: Сервер работает и БД доступна
+      summary: Состояние API, БД и версия релиза
       description: Жив ли сервер и есть ли связь с БД. Используется в healthcheck контейнера.
       operationId: health_api_health_get
       responses:
@@ -23,7 +23,14 @@ paths:
           description: Successful Response
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/HealthOut'
+        '503':
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthOut'
   /api/products:
     get:
       tags:
@@ -139,12 +146,20 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductList'
-        '422':
+        '503':
+          description: База данных недоступна
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
-          description: Unprocessable Content
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
   /api/products/{product_id}:
     get:
       tags:
@@ -166,6 +181,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProductDetail'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '404':
           content:
             application/json:
@@ -173,11 +194,13 @@ paths:
                 $ref: '#/components/schemas/ErrorOut'
           description: Not Found
         '422':
-          description: Validation Error
+          description: Ошибка полей или бизнес-валидации
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
   /api/filters:
     get:
       tags:
@@ -192,6 +215,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Filters'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
   /api/auth/register:
     post:
       tags:
@@ -211,6 +240,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TokenOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '409':
           description: Conflict
           content:
@@ -218,11 +253,13 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
         '422':
-          description: Validation Error
+          description: Ошибка полей или бизнес-валидации
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
   /api/auth/login:
     post:
       tags:
@@ -242,18 +279,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TokenOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
           description: Unauthorized
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
-        '422':
-          description: Validation Error
+        '403':
+          description: Forbidden
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                $ref: '#/components/schemas/ErrorOut'
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
   /api/auth/me:
     get:
       tags:
@@ -267,6 +318,36 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+      security:
+      - HTTPBearer: []
+  /api/auth/logout:
+    post:
+      tags:
+      - auth
+      summary: Завершить все сеансы пользователя
+      description: Отзывает все ранее выданные токены. Повтор со старым токеном возвращает 401.
+      operationId: logout_api_auth_logout_post
+      responses:
+        '204':
+          description: Successful Response
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
           description: Unauthorized
           content:
@@ -288,6 +369,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CartOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
           description: Unauthorized
           content:
@@ -315,6 +402,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CartOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
           description: Unauthorized
           content:
@@ -334,98 +427,173 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
         '422':
-          description: Validation Error
+          description: Ошибка полей или бизнес-валидации
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HTTPValidationError'
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
       security:
       - HTTPBearer: []
   /api/cart/items/{item_id}:
-    parameters:
-    - $ref: '#/components/parameters/ItemId'
     patch:
       tags:
       - cart
       summary: Изменить количество позиции в корзине
-      description: FR-07. Количество задаётся целиком, не прибавляется. Больше остатка поставить нельзя.
-      operationId: update_cart_item
+      description: Задаёт количество позиции целиком (не прибавляет). Больше остатка нельзя.
+      operationId: update_cart_item_api_cart_items__item_id__patch
       security:
       - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Item Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/CartUpdateIn'
-            example:
-              quantity: 3
+            examples:
+              default:
+                value:
+                  quantity: 3
       responses:
         '200':
-          description: Корзина целиком
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CartOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '404':
-          $ref: '#/components/responses/NotFound'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
         '409':
-          $ref: '#/components/responses/Conflict'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
         '422':
-          $ref: '#/components/responses/Unprocessable'
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
     delete:
       tags:
       - cart
       summary: Удалить позицию из корзины
-      description: FR-07. Чужая или несуществующая позиция — 404.
-      operationId: delete_cart_item
+      operationId: delete_cart_item_api_cart_items__item_id__delete
       security:
       - HTTPBearer: []
+      parameters:
+      - name: item_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Item Id
       responses:
         '200':
-          description: Корзина без этой позиции
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CartOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '404':
-          $ref: '#/components/responses/NotFound'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+      description: FR-07. Чужая или несуществующая позиция — 404.
   /api/pickup-points:
     get:
       tags:
       - orders
       summary: Пункты выдачи для самовывоза
-      operationId: list_pickup_points
+      operationId: list_pickup_points_api_pickup_points_get
       responses:
         '200':
-          description: Активные пункты выдачи
+          description: Successful Response
           content:
             application/json:
               schema:
-                type: array
                 items:
-                  $ref: '#/components/schemas/PickupPoint'
+                  $ref: '#/components/schemas/PickupPointOut'
+                type: array
+                title: Response List Pickup Points Api Pickup Points Get
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
   /api/orders:
     post:
       tags:
       - orders
       summary: Оформить заказ из корзины
-      description: 'FR-08, NFR-08. В одной транзакции проверяет и списывает остатки, создаёт заказ со статусом `new`
+      description: 'Одна транзакция: списать остатки, создать заказ со сроком оплаты, очистить корзину.
 
-        и сроком оплаты `expires_at`, очищает корзину. Повтор с тем же `Idempotency-Key` возвращает
-
-        уже созданный заказ с кодом 200 и не создаёт второй.
-
-        '
-      operationId: create_order
+        Повтор с тем же Idempotency-Key возвращает уже созданный заказ с кодом 200.'
+      operationId: create_order_api_orders_post
       security:
       - HTTPBearer: []
       parameters:
-      - $ref: '#/components/parameters/IdempotencyKey'
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: uuid
+          - type: 'null'
+          title: Idempotency-Key
       requestBody:
         required: true
         content:
@@ -448,116 +616,284 @@ paths:
                   contact_phone: '+79001112233'
       responses:
         '201':
-          description: Заказ создан
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderDetail'
-        '200':
-          description: Повтор запроса с тем же ключом, возвращён ранее созданный заказ
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderDetail'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: Корзина пуста или товара не хватает
+        '503':
+          description: База данных недоступна
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
-              examples:
-                empty:
-                  value:
-                    detail: Корзина пуста
-                stock:
-                  value:
-                    detail: 'Недостаточно товара «Футболка базовая» (M, белый): в наличии 0 шт.'
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+          description: OK
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
         '422':
-          $ref: '#/components/responses/Unprocessable'
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
     get:
       tags:
       - orders
       summary: История заказов покупателя
-      description: FR-10. Только заказы текущего пользователя, новые сверху.
-      operationId: list_my_orders
+      operationId: list_my_orders_api_orders_get
       security:
       - HTTPBearer: []
       parameters:
-      - $ref: '#/components/parameters/StatusFilter'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Offset'
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - new
+            - paid
+            - shipped
+            - delivered
+            - cancelled
+            type: string
+          - type: 'null'
+          title: Status
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
       responses:
         '200':
-          description: Страница заказов
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrderList'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-  /api/orders/{order_id}:
-    parameters:
-    - $ref: '#/components/parameters/OrderId'
-    get:
-      tags:
-      - orders
-      summary: Заказ покупателя с составом, платежами и историей статусов
-      description: FR-10. Чужой заказ — 404, а не 403, чтобы нельзя было перебором узнать, какие номера существуют.
-      operationId: get_my_order
-      security:
-      - HTTPBearer: []
-      responses:
-        '200':
-          description: Заказ
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderDetail'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /api/orders/{order_id}/cancel:
-    parameters:
-    - $ref: '#/components/parameters/OrderId'
-    post:
-      tags:
-      - orders
-      summary: Отменить неоплаченный заказ
-      description: Только статус `new`. Списанный под заказ остаток возвращается на склад.
-      operationId: cancel_my_order
-      security:
-      - HTTPBearer: []
-      responses:
-        '200':
-          description: Отменённый заказ
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OrderDetail'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Заказ уже оплачен или отменён
+        '503':
+          description: База данных недоступна
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
-              example:
-                detail: Оплаченный заказ отменяет только магазин
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+        '401':
+          description: Требуется действующий токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+      description: FR-10. Только заказы текущего пользователя, новые сверху.
+  /api/orders/{order_id}:
+    get:
+      tags:
+      - orders
+      summary: Заказ покупателя с составом, платежами и историей статусов
+      operationId: get_my_order_api_orders__order_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Order Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+        '401':
+          description: Требуется действующий токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+      description: FR-10. Чужой заказ — 404, а не 403, чтобы нельзя было перебором узнать, какие номера существуют.
+  /api/orders/{order_id}/cancel:
+    post:
+      tags:
+      - orders
+      summary: Отменить неоплаченный заказ
+      operationId: cancel_my_order_api_orders__order_id__cancel_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Order Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetail'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+        '401':
+          description: Требуется действующий токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+      description: Только статус `new`. Списанный под заказ остаток возвращается на склад.
   /api/orders/{order_id}/payments:
-    parameters:
-    - $ref: '#/components/parameters/OrderId'
     post:
       tags:
       - payments
       summary: Начать оплату заказа
+      operationId: create_payment_api_orders__order_id__payments_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Order Id
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Idempotency-Key
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentOut'
+          description: OK
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+        '401':
+          description: Требуется действующий токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
       description: 'FR-09, NFR-09. Создаёт платёж `pending` и возвращает `confirmation_url` — страницу платёжного
 
         сервиса, где покупатель вводит карту. Номер карты на наш сервер не приходит.
@@ -565,155 +901,207 @@ paths:
         `Idempotency-Key` обязателен: повтор с тем же ключом возвращает тот же платёж с кодом 200.
 
         '
-      operationId: create_payment
-      security:
-      - HTTPBearer: []
-      parameters:
-      - $ref: '#/components/parameters/IdempotencyKeyRequired'
-      responses:
-        '201':
-          description: Платёж создан
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentOut'
-        '200':
-          description: Повтор с тем же ключом
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PaymentOut'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Заказ нельзя оплатить
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorOut'
-              examples:
-                expired:
-                  value:
-                    detail: Срок оплаты истёк, заказ отменён
-                paid:
-                  value:
-                    detail: Заказ уже оплачен
-                pending:
-                  value:
-                    detail: Оплата уже начата в другой вкладке
-        '422':
-          $ref: '#/components/responses/Unprocessable'
   /api/payments/{payment_id}:
-    parameters:
-    - name: payment_id
-      in: path
-      required: true
-      schema:
-        type: integer
-        minimum: 1
     get:
       tags:
       - payments
       summary: Статус платежа
-      description: Фронт опрашивает его после возврата со страницы платёжного сервиса.
-      operationId: get_payment
+      operationId: get_payment_api_payments__payment_id__get
       security:
       - HTTPBearer: []
+      parameters:
+      - name: payment_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Payment Id
       responses:
         '200':
-          description: Платёж
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaymentOut'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '404':
-          $ref: '#/components/responses/NotFound'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+        '401':
+          description: Требуется действующий токен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+      description: Фронт опрашивает его после возврата со страницы платёжного сервиса.
   /api/test-provider/payments/{provider_payment_id}:
-    parameters:
-    - name: provider_payment_id
-      in: path
-      required: true
-      schema:
-        type: string
-        format: uuid
     post:
       tags:
       - payments
       summary: 'Тестовый платёжный сервис: результат оплаты'
-      description: 'Работает только при `PAYMENT_PROVIDER=test`, иначе 404. Играет роль уведомления от платёжного
-
-        сервиса. Повторное уведомление ничего не меняет и возвращает 200.
-
-        '
-      operationId: test_provider_complete
+      description: Эмулятор уведомления платёжного сервиса. Повторное уведомление ничего не меняет.
+      operationId: test_provider_complete_api_test_provider_payments__provider_payment_id__post
+      parameters:
+      - name: provider_payment_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+          title: Provider Payment Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/TestProviderResultIn'
-            example:
-              result: succeeded
+            examples:
+              default:
+                value:
+                  result: succeeded
       responses:
         '200':
-          description: Платёж после обработки
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaymentOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '404':
-          $ref: '#/components/responses/NotFound'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
         '409':
-          $ref: '#/components/responses/Conflict'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
   /api/admin/products:
     get:
       tags:
       - admin
       summary: Товары для админки, включая скрытые
-      operationId: admin_list_products
+      operationId: admin_list_products_api_admin_products_get
       security:
       - HTTPBearer: []
       parameters:
       - name: q
         in: query
+        required: false
         schema:
-          type: string
-          minLength: 1
-          maxLength: 100
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 100
+          - type: 'null'
+          title: Q
       - name: category
         in: query
+        required: false
         schema:
-          type: string
-          maxLength: 80
+          anyOf:
+          - type: string
+            maxLength: 80
+          - type: 'null'
+          description: slug категории
+          title: Category
+        description: slug категории
       - name: is_active
         in: query
+        required: false
         schema:
-          type: boolean
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Offset'
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Active
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
       responses:
         '200':
-          description: Страница товаров
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminProductList'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '403':
-          $ref: '#/components/responses/Forbidden'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
         '422':
-          $ref: '#/components/responses/Unprocessable'
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
     post:
       tags:
       - admin
       summary: Создать товар
-      description: FR-13. Варианты и фото добавляются отдельными запросами.
-      operationId: admin_create_product
+      operationId: admin_create_product_api_admin_products_post
       security:
       - HTTPBearer: []
       requestBody:
@@ -722,338 +1110,798 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AdminProductIn'
-            example:
-              category_id: 1
-              name: Футболка с принтом
-              description: Хлопок 100%
-              gender: unisex
-              price: '1990.00'
+            examples:
+              default:
+                value:
+                  category_id: 1
+                  name: Футболка с принтом
+                  description: Хлопок 100%
+                  gender: unisex
+                  price: '1990.00'
       responses:
         '201':
-          description: Товар создан
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminProductOut'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          description: Нет такой категории
+        '503':
+          description: База данных недоступна
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
         '422':
-          $ref: '#/components/responses/Unprocessable'
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+      description: FR-13. Варианты и фото добавляются отдельными запросами.
   /api/admin/products/{product_id}:
-    parameters:
-    - name: product_id
-      in: path
-      required: true
-      schema:
-        type: integer
-        minimum: 1
     get:
       tags:
       - admin
       summary: Товар со всеми вариантами и фото
-      operationId: admin_get_product
+      operationId: admin_get_product_api_admin_products__product_id__get
       security:
       - HTTPBearer: []
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Product Id
       responses:
         '200':
-          description: Товар
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminProductOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '403':
-          $ref: '#/components/responses/Forbidden'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
         '404':
-          $ref: '#/components/responses/NotFound'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
     patch:
       tags:
       - admin
       summary: Изменить или скрыть товар
-      description: FR-13. Передаются только меняемые поля. Скрыть — `is_active false`, физически товар не удаляется.
-      operationId: admin_update_product
+      description: Передаются только меняемые поля. Скрыть товар — is_active false, физически он не удаляется.
+      operationId: admin_update_product_api_admin_products__product_id__patch
       security:
       - HTTPBearer: []
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Product Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AdminProductPatch'
-            example:
-              price: '1790.00'
-              is_active: false
+            examples:
+              default:
+                value:
+                  price: '1790.00'
+                  is_active: false
       responses:
         '200':
-          description: Товар после изменения
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminProductOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '403':
-          $ref: '#/components/responses/Forbidden'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
         '404':
-          $ref: '#/components/responses/NotFound'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
         '422':
-          $ref: '#/components/responses/Unprocessable'
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
   /api/admin/products/{product_id}/variants:
-    parameters:
-    - name: product_id
-      in: path
-      required: true
-      schema:
-        type: integer
-        minimum: 1
     post:
       tags:
       - admin
       summary: Добавить вариант товара (размер и цвет)
-      description: FR-14. Начальный остаток записывается в журнал движения остатков.
-      operationId: admin_create_variant
+      operationId: admin_create_variant_api_admin_products__product_id__variants_post
       security:
       - HTTPBearer: []
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Product Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AdminVariantIn'
-            example:
-              size: L
-              color: чёрный
-              sku: TSH-P-L-BLK
-              initial_stock: 10
+            examples:
+              default:
+                value:
+                  size: L
+                  color: чёрный
+                  sku: TSH-P-L-BLK
+                  initial_stock: 10
       responses:
         '201':
-          description: Вариант создан
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminVariantOut'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Такой SKU или такая пара размер и цвет уже есть
+        '503':
+          description: База данных недоступна
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
-              example:
-                detail: Вариант L, чёрный у этого товара уже есть
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
         '422':
-          $ref: '#/components/responses/Unprocessable'
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+      description: FR-14. Начальный остаток записывается в журнал движения остатков.
   /api/admin/variants/{variant_id}:
-    parameters:
-    - $ref: '#/components/parameters/VariantId'
     patch:
       tags:
       - admin
       summary: Изменить или скрыть вариант
-      description: FR-14. Остаток здесь не меняется, для него есть корректировки.
-      operationId: admin_update_variant
+      description: 'Остаток здесь не меняется: для него есть корректировки.'
+      operationId: admin_update_variant_api_admin_variants__variant_id__patch
       security:
       - HTTPBearer: []
+      parameters:
+      - name: variant_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Variant Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AdminVariantPatch'
-            example:
-              is_active: false
+            examples:
+              default:
+                value:
+                  is_active: false
       responses:
         '200':
-          description: Вариант после изменения
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminVariantOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '403':
-          $ref: '#/components/responses/Forbidden'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
         '404':
-          $ref: '#/components/responses/NotFound'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
         '409':
-          $ref: '#/components/responses/Conflict'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
         '422':
-          $ref: '#/components/responses/Unprocessable'
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
   /api/admin/variants/{variant_id}/stock-movements:
-    parameters:
-    - $ref: '#/components/parameters/VariantId'
     post:
       tags:
       - admin
       summary: Корректировка остатка (+N или −N)
-      description: 'FR-14, NFR-08. Остаток меняется на `delta`, а не устанавливается числом, чтобы правка не затёрла
+      description: 'Остаток меняется на delta, а не устанавливается числом: правка не затрёт резерв
 
-        резерв покупателя, сделанный в ту же секунду. Уйти ниже нуля нельзя — 409.
-
-        '
-      operationId: admin_adjust_stock
+        покупателя, сделанный в ту же секунду (строка варианта заблокирована).'
+      operationId: admin_adjust_stock_api_admin_variants__variant_id__stock_movements_post
       security:
       - HTTPBearer: []
+      parameters:
+      - name: variant_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Variant Id
       requestBody:
         required: true
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/StockAdjustmentIn'
-            example:
-              delta: 5
-              comment: Поставка 05.11
+            examples:
+              default:
+                value:
+                  delta: 5
+                  comment: Поставка 05.11
       responses:
         '201':
-          description: Запись журнала и новый остаток
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StockMovementOut'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Остаток ушёл бы ниже нуля
+        '503':
+          description: База данных недоступна
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
-              example:
-                detail: 'Нельзя списать 5 шт.: в наличии 2 шт.'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
         '422':
-          $ref: '#/components/responses/Unprocessable'
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
     get:
       tags:
       - admin
       summary: Журнал движения остатка варианта
-      operationId: admin_list_stock_movements
+      operationId: admin_list_stock_movements_api_admin_variants__variant_id__stock_movements_get
       security:
       - HTTPBearer: []
       parameters:
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Offset'
+      - name: variant_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Variant Id
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
       responses:
         '200':
-          description: Записи журнала, новые сверху
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StockMovementList'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
         '401':
-          $ref: '#/components/responses/Unauthorized'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
         '403':
-          $ref: '#/components/responses/Forbidden'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
         '404':
-          $ref: '#/components/responses/NotFound'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+  /api/admin/orders:
+    get:
+      tags:
+      - admin
+      summary: Все заказы с фильтрами
+      operationId: admin_list_orders_api_admin_orders_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - enum:
+            - new
+            - paid
+            - shipped
+            - delivered
+            - cancelled
+            type: string
+          - type: 'null'
+          title: Status
+      - name: user_email
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            minLength: 1
+            maxLength: 255
+          - type: 'null'
+          description: Часть email покупателя
+          title: User Email
+        description: Часть email покупателя
+      - name: date_from
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          examples:
+          - '2026-11-01'
+          title: Date From
+      - name: date_to
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            format: date
+          - type: 'null'
+          examples:
+          - '2026-11-30'
+          title: Date To
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          default: 20
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderList'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+      description: FR-15.
+  /api/admin/orders/{order_id}:
+    get:
+      tags:
+      - admin
+      summary: Любой заказ с составом, платежами и историей
+      operationId: admin_get_order_api_admin_orders__order_id__get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Order Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+  /api/admin/orders/{order_id}/status:
+    post:
+      tags:
+      - admin
+      summary: Сменить статус заказа
+      operationId: admin_change_order_status_api_admin_orders__order_id__status_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: order_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Order Id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusChangeIn'
+            examples:
+              default:
+                value:
+                  status: shipped
+                  comment: Передан в СДЭК, трек 1234567890
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminOrderOut'
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Conflict
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+      description: 'FR-15. Допустимые переходы: `new → cancelled`, `paid → shipped`, `paid → cancelled`,
+
+        `shipped → delivered`. В `paid` заказ переводит только оплата. При отмене остаток возвращается.
+
+        '
   /api/admin/products/{product_id}/images:
-    parameters:
-    - name: product_id
-      in: path
-      required: true
-      schema:
-        type: integer
-        minimum: 1
     post:
       tags:
       - admin
       summary: Загрузить фото товара в MinIO
-      description: FR-13. JPEG, PNG или WebP до 5 МБ. Тип проверяется по содержимому файла, а не по расширению.
-      operationId: admin_upload_image
+      operationId: admin_upload_image_api_admin_products__product_id__images_post
       security:
       - HTTPBearer: []
+      parameters:
+      - name: product_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Product Id
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
-              type: object
-              required:
-              - file
-              properties:
-                file:
-                  type: string
-                  format: binary
-                color:
-                  type: string
-                  maxLength: 40
-                  description: Цвет варианта, к которому относится фото. Необязательно
-                sort_order:
-                  type: integer
-                  minimum: 0
-                  maximum: 100
-                  default: 0
+              $ref: '#/components/schemas/Body_admin_upload_image_api_admin_products__product_id__images_post'
       responses:
         '201':
-          description: Фото сохранено
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ImageOut'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '413':
-          description: Файл больше 5 МБ
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorOut'
-              example:
-                detail: Файл больше 5 МБ
-        '415':
-          description: Не JPEG, PNG или WebP
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorOut'
-              example:
-                detail: Поддерживаются только JPEG, PNG и WebP
-        '422':
-          $ref: '#/components/responses/Unprocessable'
         '503':
-          description: Хранилище фото недоступно
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
-              example:
-                detail: Хранилище фото недоступно, попробуйте позже
+          description: Service Unavailable
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '413':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Content Too Large
+        '415':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unsupported Media Type
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+      description: FR-13. JPEG, PNG или WebP до 5 МБ. Тип проверяется по содержимому файла, а не по расширению.
   /api/admin/images/{image_id}:
-    parameters:
-    - name: image_id
-      in: path
-      required: true
-      schema:
-        type: integer
-        minimum: 1
     patch:
       tags:
       - admin
       summary: Изменить цвет или порядок фото
-      operationId: admin_update_image
+      operationId: admin_update_image_api_admin_images__image_id__patch
       security:
       - HTTPBearer: []
+      parameters:
+      - name: image_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Image Id
       requestBody:
         required: true
         content:
@@ -1062,152 +1910,551 @@ paths:
               $ref: '#/components/schemas/ImagePatch'
       responses:
         '200':
-          description: Фото после изменения
+          description: Successful Response
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ImageOut'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-    delete:
-      tags:
-      - admin
-      summary: Удалить фото
-      description: Удаляет строку в БД и файл в MinIO.
-      operationId: admin_delete_image
-      security:
-      - HTTPBearer: []
-      responses:
-        '204':
-          description: Фото удалено
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /api/admin/orders:
-    get:
-      tags:
-      - admin
-      summary: Все заказы с фильтрами
-      description: FR-15.
-      operationId: admin_list_orders
-      security:
-      - HTTPBearer: []
-      parameters:
-      - $ref: '#/components/parameters/StatusFilter'
-      - name: user_email
-        in: query
-        schema:
-          type: string
-          maxLength: 255
-        description: Часть email покупателя
-      - name: date_from
-        in: query
-        schema:
-          type: string
-          format: date
-        example: '2026-11-01'
-      - name: date_to
-        in: query
-        schema:
-          type: string
-          format: date
-        example: '2026-11-30'
-      - $ref: '#/components/parameters/Limit'
-      - $ref: '#/components/parameters/Offset'
-      responses:
-        '200':
-          description: Страница заказов
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminOrderList'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '422':
-          $ref: '#/components/responses/Unprocessable'
-  /api/admin/orders/{order_id}:
-    parameters:
-    - $ref: '#/components/parameters/OrderId'
-    get:
-      tags:
-      - admin
-      summary: Любой заказ с составом, платежами и историей
-      operationId: admin_get_order
-      security:
-      - HTTPBearer: []
-      responses:
-        '200':
-          description: Заказ
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminOrderOut'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-  /api/admin/orders/{order_id}/status:
-    parameters:
-    - $ref: '#/components/parameters/OrderId'
-    post:
-      tags:
-      - admin
-      summary: Сменить статус заказа
-      description: 'FR-15. Допустимые переходы: `new → cancelled`, `paid → shipped`, `paid → cancelled`,
-
-        `shipped → delivered`. В `paid` заказ переводит только оплата. При отмене остаток возвращается.
-
-        '
-      operationId: admin_change_order_status
-      security:
-      - HTTPBearer: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/OrderStatusChangeIn'
-            example:
-              status: shipped
-              comment: Передан в СДЭК, трек 1234567890
-      responses:
-        '200':
-          description: Заказ после смены статуса
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AdminOrderOut'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          description: Недопустимый переход
+        '503':
+          description: База данных недоступна
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorOut'
-              example:
-                detail: Нельзя перевести заказ из статуса new в delivered
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
         '422':
-          $ref: '#/components/responses/Unprocessable'
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+    delete:
+      tags:
+      - admin
+      summary: Удалить фото
+      operationId: admin_delete_image_api_admin_images__image_id__delete
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: image_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          minimum: 1
+          title: Image Id
+      responses:
+        '204':
+          description: Successful Response
+        '503':
+          description: База данных недоступна
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Unauthorized
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Forbidden
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorOut'
+          description: Not Found
+        '422':
+          description: Ошибка полей или бизнес-валидации
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/HTTPValidationError'
+                - $ref: '#/components/schemas/ErrorOut'
+      description: Удаляет строку в БД и файл в MinIO.
 components:
   schemas:
+    AdminOrderList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/AdminOrderSummary'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      title: AdminOrderList
+    AdminOrderOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        status:
+          type: string
+          enum:
+          - new
+          - paid
+          - shipped
+          - delivered
+          - cancelled
+          title: Status
+        total_amount:
+          type: string
+          title: Total Amount
+        items_count:
+          type: integer
+          title: Items Count
+        delivery_method:
+          type: string
+          enum:
+          - courier
+          - pickup
+          title: Delivery Method
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
+        delivery_address:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Delivery Address
+        pickup_point:
+          anyOf:
+          - $ref: '#/components/schemas/PickupPointOut'
+          - type: 'null'
+        contact_phone:
+          type: string
+          title: Contact Phone
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+        cancel_reason:
+          anyOf:
+          - type: string
+            enum:
+            - customer
+            - expired
+            - admin
+            - payment_failed
+          - type: 'null'
+          title: Cancel Reason
+        items:
+          items:
+            $ref: '#/components/schemas/OrderItemOut'
+          type: array
+          title: Items
+        payments:
+          items:
+            $ref: '#/components/schemas/PaymentOut'
+          type: array
+          title: Payments
+        history:
+          items:
+            $ref: '#/components/schemas/StatusChangeOut'
+          type: array
+          title: History
+        customer:
+          $ref: '#/components/schemas/CustomerShort'
+      type: object
+      required:
+      - id
+      - status
+      - total_amount
+      - items_count
+      - delivery_method
+      - created_at
+      - expires_at
+      - delivery_address
+      - pickup_point
+      - contact_phone
+      - comment
+      - cancel_reason
+      - items
+      - payments
+      - history
+      - customer
+      title: AdminOrderOut
+    AdminOrderSummary:
+      properties:
+        id:
+          type: integer
+          title: Id
+        status:
+          type: string
+          enum:
+          - new
+          - paid
+          - shipped
+          - delivered
+          - cancelled
+          title: Status
+        total_amount:
+          type: string
+          title: Total Amount
+        items_count:
+          type: integer
+          title: Items Count
+        delivery_method:
+          type: string
+          enum:
+          - courier
+          - pickup
+          title: Delivery Method
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
+        customer:
+          $ref: '#/components/schemas/CustomerShort'
+      type: object
+      required:
+      - id
+      - status
+      - total_amount
+      - items_count
+      - delivery_method
+      - created_at
+      - expires_at
+      - customer
+      title: AdminOrderSummary
+    AdminProductIn:
+      properties:
+        category_id:
+          type: integer
+          minimum: 1.0
+          title: Category Id
+        name:
+          type: string
+          maxLength: 160
+          minLength: 1
+          title: Name
+        description:
+          anyOf:
+          - type: string
+            maxLength: 5000
+          - type: 'null'
+          title: Description
+        gender:
+          type: string
+          enum:
+          - men
+          - women
+          - unisex
+          title: Gender
+        price:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          title: Price
+          examples:
+          - '1990.00'
+        is_active:
+          type: boolean
+          title: Is Active
+          default: true
+      type: object
+      required:
+      - category_id
+      - name
+      - gender
+      - price
+      title: AdminProductIn
+    AdminProductList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/AdminProductOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      title: AdminProductList
+    AdminProductOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        category:
+          $ref: '#/components/schemas/CategoryOut'
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+        gender:
+          type: string
+          enum:
+          - men
+          - women
+          - unisex
+          title: Gender
+        price:
+          type: string
+          title: Price
+        is_active:
+          type: boolean
+          title: Is Active
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        variants:
+          items:
+            $ref: '#/components/schemas/AdminVariantOut'
+          type: array
+          title: Variants
+        images:
+          items:
+            $ref: '#/components/schemas/ImageOut'
+          type: array
+          title: Images
+      type: object
+      required:
+      - id
+      - category
+      - name
+      - description
+      - gender
+      - price
+      - is_active
+      - created_at
+      - updated_at
+      - variants
+      - images
+      title: AdminProductOut
+    AdminProductPatch:
+      properties:
+        category_id:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Category Id
+        name:
+          anyOf:
+          - type: string
+            maxLength: 160
+            minLength: 1
+          - type: 'null'
+          title: Name
+        description:
+          anyOf:
+          - type: string
+            maxLength: 5000
+          - type: 'null'
+          title: Description
+        gender:
+          anyOf:
+          - type: string
+            enum:
+            - men
+            - women
+            - unisex
+          - type: 'null'
+          title: Gender
+        price:
+          anyOf:
+          - type: number
+            exclusiveMinimum: 0.0
+          - type: string
+          - type: 'null'
+          title: Price
+        is_active:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Active
+      type: object
+      title: AdminProductPatch
+    AdminVariantIn:
+      properties:
+        size:
+          type: string
+          maxLength: 10
+          minLength: 1
+          title: Size
+        color:
+          type: string
+          maxLength: 40
+          minLength: 1
+          title: Color
+        sku:
+          type: string
+          pattern: ^[A-Z0-9-]{3,40}$
+          title: Sku
+          examples:
+          - TSH-P-L-BLK
+        initial_stock:
+          type: integer
+          maximum: 10000.0
+          minimum: 0.0
+          title: Initial Stock
+          default: 0
+      type: object
+      required:
+      - size
+      - color
+      - sku
+      title: AdminVariantIn
+    AdminVariantOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        product_id:
+          type: integer
+          title: Product Id
+        size:
+          type: string
+          title: Size
+        color:
+          type: string
+          title: Color
+        sku:
+          type: string
+          title: Sku
+        stock:
+          type: integer
+          title: Stock
+        is_active:
+          type: boolean
+          title: Is Active
+      type: object
+      required:
+      - id
+      - product_id
+      - size
+      - color
+      - sku
+      - stock
+      - is_active
+      title: AdminVariantOut
+    AdminVariantPatch:
+      properties:
+        size:
+          anyOf:
+          - type: string
+            maxLength: 10
+            minLength: 1
+          - type: 'null'
+          title: Size
+        color:
+          anyOf:
+          - type: string
+            maxLength: 40
+            minLength: 1
+          - type: 'null'
+          title: Color
+        sku:
+          anyOf:
+          - type: string
+            pattern: ^[A-Z0-9-]{3,40}$
+          - type: 'null'
+          title: Sku
+        is_active:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Is Active
+      type: object
+      title: AdminVariantPatch
+    Body_admin_upload_image_api_admin_products__product_id__images_post:
+      properties:
+        file:
+          type: string
+          format: binary
+          title: File
+        color:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Color
+        sort_order:
+          type: integer
+          maximum: 100.0
+          minimum: 0.0
+          title: Sort Order
+          default: 0
+      type: object
+      required:
+      - file
+      title: Body_admin_upload_image_api_admin_products__product_id__images_post
     CartAddIn:
       properties:
         variant_id:
@@ -1252,6 +2499,11 @@ components:
           - type: string
           - type: 'null'
           title: Image Key
+        image_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Image Url
         price:
           type: string
           title: Price
@@ -1264,11 +2516,6 @@ components:
         line_total:
           type: string
           title: Line Total
-        image_url:
-          type:
-          - string
-          - 'null'
-          description: Новое в этапе III
       type: object
       required:
       - id
@@ -1279,6 +2526,7 @@ components:
       - color
       - sku
       - image_key
+      - image_url
       - price
       - quantity
       - stock
@@ -1303,6 +2551,17 @@ components:
       - total_quantity
       - total
       title: CartOut
+    CartUpdateIn:
+      properties:
+        quantity:
+          type: integer
+          maximum: 99.0
+          minimum: 1.0
+          title: Quantity
+      type: object
+      required:
+      - quantity
+      title: CartUpdateIn
     CategoryOut:
       properties:
         id:
@@ -1320,6 +2579,29 @@ components:
       - name
       - slug
       title: CategoryOut
+    CustomerShort:
+      properties:
+        id:
+          type: integer
+          title: Id
+        email:
+          type: string
+          title: Email
+        full_name:
+          type: string
+          title: Full Name
+        phone:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Phone
+      type: object
+      required:
+      - id
+      - email
+      - full_name
+      - phone
+      title: CustomerShort
     ErrorOut:
       properties:
         detail:
@@ -1374,6 +2656,79 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
+    HealthOut:
+      properties:
+        status:
+          type: string
+          title: Status
+        db:
+          type: string
+          title: Db
+        version:
+          type: string
+          title: Version
+      type: object
+      required:
+      - status
+      - db
+      - version
+      title: HealthOut
+    ImageOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        product_id:
+          type: integer
+          title: Product Id
+        image_url:
+          type: string
+          title: Image Url
+        color:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Color
+        sort_order:
+          type: integer
+          title: Sort Order
+        content_type:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Content Type
+        size_bytes:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Size Bytes
+      type: object
+      required:
+      - id
+      - product_id
+      - image_url
+      - color
+      - sort_order
+      - content_type
+      - size_bytes
+      title: ImageOut
+    ImagePatch:
+      properties:
+        color:
+          anyOf:
+          - type: string
+            maxLength: 40
+          - type: 'null'
+          title: Color
+        sort_order:
+          anyOf:
+          - type: integer
+            maximum: 100.0
+            minimum: 0.0
+          - type: 'null'
+          title: Sort Order
+      type: object
+      title: ImagePatch
     LoginIn:
       properties:
         email:
@@ -1391,6 +2746,347 @@ components:
       - email
       - password
       title: LoginIn
+    OrderCreateIn:
+      properties:
+        delivery_method:
+          type: string
+          enum:
+          - courier
+          - pickup
+          title: Delivery Method
+        delivery_address:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Delivery Address
+        pickup_point_id:
+          anyOf:
+          - type: integer
+            minimum: 1.0
+          - type: 'null'
+          title: Pickup Point Id
+        contact_phone:
+          type: string
+          pattern: ^\+?[0-9]{10,15}$
+          title: Contact Phone
+          examples:
+          - '+79001112233'
+        comment:
+          anyOf:
+          - type: string
+            maxLength: 500
+          - type: 'null'
+          title: Comment
+      type: object
+      required:
+      - delivery_method
+      - contact_phone
+      title: OrderCreateIn
+    OrderDetail:
+      properties:
+        id:
+          type: integer
+          title: Id
+        status:
+          type: string
+          enum:
+          - new
+          - paid
+          - shipped
+          - delivered
+          - cancelled
+          title: Status
+        total_amount:
+          type: string
+          title: Total Amount
+        items_count:
+          type: integer
+          title: Items Count
+        delivery_method:
+          type: string
+          enum:
+          - courier
+          - pickup
+          title: Delivery Method
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
+        delivery_address:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Delivery Address
+        pickup_point:
+          anyOf:
+          - $ref: '#/components/schemas/PickupPointOut'
+          - type: 'null'
+        contact_phone:
+          type: string
+          title: Contact Phone
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+        cancel_reason:
+          anyOf:
+          - type: string
+            enum:
+            - customer
+            - expired
+            - admin
+            - payment_failed
+          - type: 'null'
+          title: Cancel Reason
+        items:
+          items:
+            $ref: '#/components/schemas/OrderItemOut'
+          type: array
+          title: Items
+        payments:
+          items:
+            $ref: '#/components/schemas/PaymentOut'
+          type: array
+          title: Payments
+        history:
+          items:
+            $ref: '#/components/schemas/StatusChangeOut'
+          type: array
+          title: History
+      type: object
+      required:
+      - id
+      - status
+      - total_amount
+      - items_count
+      - delivery_method
+      - created_at
+      - expires_at
+      - delivery_address
+      - pickup_point
+      - contact_phone
+      - comment
+      - cancel_reason
+      - items
+      - payments
+      - history
+      title: OrderDetail
+    OrderItemOut:
+      properties:
+        variant_id:
+          type: integer
+          title: Variant Id
+        product_id:
+          type: integer
+          title: Product Id
+        name:
+          type: string
+          title: Name
+        size:
+          type: string
+          title: Size
+        color:
+          type: string
+          title: Color
+        sku:
+          type: string
+          title: Sku
+        image_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Image Url
+        quantity:
+          type: integer
+          title: Quantity
+        price:
+          type: string
+          title: Price
+        line_total:
+          type: string
+          title: Line Total
+      type: object
+      required:
+      - variant_id
+      - product_id
+      - name
+      - size
+      - color
+      - sku
+      - image_url
+      - quantity
+      - price
+      - line_total
+      title: OrderItemOut
+    OrderList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/OrderSummary'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      title: OrderList
+    OrderStatusChangeIn:
+      properties:
+        status:
+          type: string
+          enum:
+          - shipped
+          - delivered
+          - cancelled
+          title: Status
+        comment:
+          anyOf:
+          - type: string
+            maxLength: 300
+          - type: 'null'
+          title: Comment
+      type: object
+      required:
+      - status
+      title: OrderStatusChangeIn
+    OrderSummary:
+      properties:
+        id:
+          type: integer
+          title: Id
+        status:
+          type: string
+          enum:
+          - new
+          - paid
+          - shipped
+          - delivered
+          - cancelled
+          title: Status
+        total_amount:
+          type: string
+          title: Total Amount
+        items_count:
+          type: integer
+          title: Items Count
+        delivery_method:
+          type: string
+          enum:
+          - courier
+          - pickup
+          title: Delivery Method
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        expires_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Expires At
+      type: object
+      required:
+      - id
+      - status
+      - total_amount
+      - items_count
+      - delivery_method
+      - created_at
+      - expires_at
+      title: OrderSummary
+    PaymentOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        order_id:
+          type: integer
+          title: Order Id
+        status:
+          type: string
+          enum:
+          - pending
+          - succeeded
+          - failed
+          - cancelled
+          title: Status
+        amount:
+          type: string
+          title: Amount
+        confirmation_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Confirmation Url
+        failure_reason:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Failure Reason
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        paid_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Paid At
+      type: object
+      required:
+      - id
+      - order_id
+      - status
+      - amount
+      - confirmation_url
+      - failure_reason
+      - created_at
+      - paid_at
+      title: PaymentOut
+    PickupPointOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        address:
+          type: string
+          title: Address
+        hours:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Hours
+      type: object
+      required:
+      - id
+      - name
+      - address
+      - hours
+      title: PickupPointOut
     ProductDetail:
       properties:
         id:
@@ -1417,16 +3113,16 @@ components:
             type: string
           type: array
           title: Image Keys
+        image_urls:
+          items:
+            type: string
+          type: array
+          title: Image Urls
         variants:
           items:
             $ref: '#/components/schemas/VariantOut'
           type: array
           title: Variants
-        image_urls:
-          type: array
-          items:
-            type: string
-          description: Новое в этапе III. Ссылки на фото по порядку
       type: object
       required:
       - id
@@ -1436,6 +3132,7 @@ components:
       - gender
       - category
       - image_keys
+      - image_urls
       - variants
       title: ProductDetail
     ProductList:
@@ -1482,15 +3179,14 @@ components:
           - type: string
           - type: 'null'
           title: Image Key
+        image_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Image Url
         in_stock:
           type: boolean
           title: In Stock
-        image_url:
-          type:
-          - string
-          - 'null'
-          example: /media/products/1/3c9e1f0a.jpg
-          description: Новое в этапе III. Готовая ссылка на первое фото
       type: object
       required:
       - id
@@ -1499,6 +3195,7 @@ components:
       - gender
       - category
       - image_key
+      - image_url
       - in_stock
       title: ProductListItem
     RegisterIn:
@@ -1532,6 +3229,164 @@ components:
       - password
       - full_name
       title: RegisterIn
+    StatusChangeOut:
+      properties:
+        from_status:
+          anyOf:
+          - type: string
+            enum:
+            - new
+            - paid
+            - shipped
+            - delivered
+            - cancelled
+          - type: 'null'
+          title: From Status
+        to_status:
+          type: string
+          enum:
+          - new
+          - paid
+          - shipped
+          - delivered
+          - cancelled
+          title: To Status
+        changed_by:
+          type: string
+          enum:
+          - customer
+          - admin
+          - system
+          title: Changed By
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - from_status
+      - to_status
+      - changed_by
+      - comment
+      - created_at
+      title: StatusChangeOut
+    StockAdjustmentIn:
+      properties:
+        delta:
+          type: integer
+          maximum: 10000.0
+          minimum: -10000.0
+          title: Delta
+          description: Положительное — приход, отрицательное — списание
+        comment:
+          type: string
+          maxLength: 300
+          minLength: 1
+          title: Comment
+      type: object
+      required:
+      - delta
+      - comment
+      title: StockAdjustmentIn
+    StockMovementList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/StockMovementOut'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      title: StockMovementList
+    StockMovementOut:
+      properties:
+        id:
+          type: integer
+          title: Id
+        variant_id:
+          type: integer
+          title: Variant Id
+        delta:
+          type: integer
+          title: Delta
+        reason:
+          type: string
+          enum:
+          - reserve
+          - release
+          - adjust
+          - initial
+          title: Reason
+        order_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Order Id
+        changed_by:
+          anyOf:
+          - $ref: '#/components/schemas/CustomerShort'
+          - type: 'null'
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+        stock_after:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Stock After
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+      type: object
+      required:
+      - id
+      - variant_id
+      - delta
+      - reason
+      - order_id
+      - changed_by
+      - comment
+      - created_at
+      title: StockMovementOut
+    TestProviderResultIn:
+      properties:
+        result:
+          type: string
+          enum:
+          - succeeded
+          - failed
+          title: Result
+        failure_reason:
+          anyOf:
+          - type: string
+            maxLength: 120
+          - type: 'null'
+          title: Failure Reason
+      type: object
+      required:
+      - result
+      title: TestProviderResultIn
     TokenOut:
       properties:
         access_token:
@@ -1625,786 +3480,14 @@ components:
       - stock
       - in_stock
       title: VariantOut
-    Money:
-      type: string
-      pattern: ^\d{1,8}\.\d{2}$
-      description: Сумма в рублях строкой с двумя знаками после точки, чтобы не терять копейки
-      example: '1290.00'
-    OrderStatus:
-      type: string
-      enum:
-      - new
-      - paid
-      - shipped
-      - delivered
-      - cancelled
-      description: new — ждёт оплаты, paid — оплачен, shipped — передан в доставку, delivered — получен, cancelled — отменён
-    CartUpdateIn:
-      type: object
-      required:
-      - quantity
-      properties:
-        quantity:
-          type: integer
-          minimum: 1
-          maximum: 99
-    PickupPoint:
-      type: object
-      required:
-      - id
-      - name
-      - address
-      properties:
-        id:
-          type: integer
-        name:
-          type: string
-          example: Пункт выдачи «Вернадского»
-        address:
-          type: string
-          example: Москва, пр. Вернадского, 78
-        hours:
-          type:
-          - string
-          - 'null'
-          example: Ежедневно 10:00–21:00
-    OrderCreateIn:
-      type: object
-      required:
-      - delivery_method
-      - contact_phone
-      properties:
-        delivery_method:
-          type: string
-          enum:
-          - courier
-          - pickup
-        delivery_address:
-          type:
-          - string
-          - 'null'
-          minLength: 5
-          maxLength: 300
-          description: Обязателен для courier, запрещён для pickup
-        pickup_point_id:
-          type:
-          - integer
-          - 'null'
-          minimum: 1
-          description: Обязателен для pickup, запрещён для courier
-        contact_phone:
-          type: string
-          pattern: ^\+?[0-9]{10,15}$
-          example: '+79001112233'
-        comment:
-          type:
-          - string
-          - 'null'
-          maxLength: 500
-    OrderItemOut:
-      type: object
-      required:
-      - variant_id
-      - product_id
-      - name
-      - size
-      - color
-      - sku
-      - quantity
-      - price
-      - line_total
-      properties:
-        variant_id:
-          type: integer
-        product_id:
-          type: integer
-        name:
-          type: string
-        size:
-          type: string
-        color:
-          type: string
-        sku:
-          type: string
-        image_url:
-          type:
-          - string
-          - 'null'
-          example: /media/products/1/3c9e.jpg
-        quantity:
-          type: integer
-        price:
-          $ref: '#/components/schemas/Money'
-        line_total:
-          $ref: '#/components/schemas/Money'
-    StatusChangeOut:
-      type: object
-      required:
-      - to_status
-      - changed_by
-      - created_at
-      properties:
-        from_status:
-          oneOf:
-          - $ref: '#/components/schemas/OrderStatus'
-          - type: 'null'
-        to_status:
-          $ref: '#/components/schemas/OrderStatus'
-        changed_by:
-          type: string
-          enum:
-          - customer
-          - admin
-          - system
-          description: Кто сменил статус. Конкретного администратора покупателю не показываем
-        comment:
-          type:
-          - string
-          - 'null'
-        created_at:
-          type: string
-          format: date-time
-    PaymentOut:
-      type: object
-      required:
-      - id
-      - order_id
-      - status
-      - amount
-      - created_at
-      properties:
-        id:
-          type: integer
-        order_id:
-          type: integer
-        status:
-          type: string
-          enum:
-          - pending
-          - succeeded
-          - failed
-          - cancelled
-        amount:
-          $ref: '#/components/schemas/Money'
-        confirmation_url:
-          type:
-          - string
-          - 'null'
-          description: Страница платёжного сервиса, только у pending
-          example: /pay/test/0b9f5c1e-8a2d-4f3b-9c7e-2d1a4b6c8e0f
-        failure_reason:
-          type:
-          - string
-          - 'null'
-          example: Недостаточно средств
-        created_at:
-          type: string
-          format: date-time
-        paid_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-    TestProviderResultIn:
-      type: object
-      required:
-      - result
-      properties:
-        result:
-          type: string
-          enum:
-          - succeeded
-          - failed
-        failure_reason:
-          type:
-          - string
-          - 'null'
-          maxLength: 120
-    OrderSummary:
-      type: object
-      required:
-      - id
-      - status
-      - total_amount
-      - items_count
-      - delivery_method
-      - created_at
-      properties:
-        id:
-          type: integer
-        status:
-          $ref: '#/components/schemas/OrderStatus'
-        total_amount:
-          $ref: '#/components/schemas/Money'
-        items_count:
-          type: integer
-          description: Сколько всего штук в заказе
-        delivery_method:
-          type: string
-          enum:
-          - courier
-          - pickup
-        created_at:
-          type: string
-          format: date-time
-        expires_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: До какого момента нужно оплатить. Только у new
-    OrderDetail:
-      allOf:
-      - $ref: '#/components/schemas/OrderSummary'
-      - type: object
-        required:
-        - contact_phone
-        - items
-        - payments
-        - history
-        properties:
-          delivery_address:
-            type:
-            - string
-            - 'null'
-          pickup_point:
-            oneOf:
-            - $ref: '#/components/schemas/PickupPoint'
-            - type: 'null'
-          contact_phone:
-            type: string
-          comment:
-            type:
-            - string
-            - 'null'
-          cancel_reason:
-            type:
-            - string
-            - 'null'
-            enum:
-            - customer
-            - expired
-            - admin
-            - payment_failed
-            - null
-          items:
-            type: array
-            items:
-              $ref: '#/components/schemas/OrderItemOut'
-          payments:
-            type: array
-            items:
-              $ref: '#/components/schemas/PaymentOut'
-          history:
-            type: array
-            items:
-              $ref: '#/components/schemas/StatusChangeOut'
-    OrderList:
-      type: object
-      required:
-      - items
-      - total
-      - limit
-      - offset
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/OrderSummary'
-        total:
-          type: integer
-        limit:
-          type: integer
-        offset:
-          type: integer
-    CustomerShort:
-      type: object
-      required:
-      - id
-      - email
-      - full_name
-      properties:
-        id:
-          type: integer
-        email:
-          type: string
-        full_name:
-          type: string
-        phone:
-          type:
-          - string
-          - 'null'
-    AdminOrderOut:
-      allOf:
-      - $ref: '#/components/schemas/OrderDetail'
-      - type: object
-        required:
-        - customer
-        properties:
-          customer:
-            $ref: '#/components/schemas/CustomerShort'
-    AdminOrderList:
-      type: object
-      required:
-      - items
-      - total
-      - limit
-      - offset
-      properties:
-        items:
-          type: array
-          items:
-            allOf:
-            - $ref: '#/components/schemas/OrderSummary'
-            - type: object
-              required:
-              - customer
-              properties:
-                customer:
-                  $ref: '#/components/schemas/CustomerShort'
-        total:
-          type: integer
-        limit:
-          type: integer
-        offset:
-          type: integer
-    OrderStatusChangeIn:
-      type: object
-      required:
-      - status
-      properties:
-        status:
-          type: string
-          enum:
-          - shipped
-          - delivered
-          - cancelled
-        comment:
-          type:
-          - string
-          - 'null'
-          maxLength: 300
-    AdminProductIn:
-      type: object
-      required:
-      - category_id
-      - name
-      - gender
-      - price
-      properties:
-        category_id:
-          type: integer
-          minimum: 1
-        name:
-          type: string
-          minLength: 1
-          maxLength: 160
-        description:
-          type:
-          - string
-          - 'null'
-          maxLength: 5000
-        gender:
-          type: string
-          enum:
-          - men
-          - women
-          - unisex
-        price:
-          $ref: '#/components/schemas/Money'
-        is_active:
-          type: boolean
-          default: true
-    AdminProductPatch:
-      type: object
-      minProperties: 1
-      properties:
-        category_id:
-          type: integer
-          minimum: 1
-        name:
-          type: string
-          minLength: 1
-          maxLength: 160
-        description:
-          type:
-          - string
-          - 'null'
-          maxLength: 5000
-        gender:
-          type: string
-          enum:
-          - men
-          - women
-          - unisex
-        price:
-          $ref: '#/components/schemas/Money'
-        is_active:
-          type: boolean
-    AdminVariantIn:
-      type: object
-      required:
-      - size
-      - color
-      - sku
-      properties:
-        size:
-          type: string
-          minLength: 1
-          maxLength: 10
-        color:
-          type: string
-          minLength: 1
-          maxLength: 40
-        sku:
-          type: string
-          pattern: ^[A-Z0-9-]{3,40}$
-        initial_stock:
-          type: integer
-          minimum: 0
-          maximum: 10000
-          default: 0
-    AdminVariantPatch:
-      type: object
-      minProperties: 1
-      properties:
-        size:
-          type: string
-          minLength: 1
-          maxLength: 10
-        color:
-          type: string
-          minLength: 1
-          maxLength: 40
-        sku:
-          type: string
-          pattern: ^[A-Z0-9-]{3,40}$
-        is_active:
-          type: boolean
-    AdminVariantOut:
-      type: object
-      required:
-      - id
-      - product_id
-      - size
-      - color
-      - sku
-      - stock
-      - is_active
-      properties:
-        id:
-          type: integer
-        product_id:
-          type: integer
-        size:
-          type: string
-        color:
-          type: string
-        sku:
-          type: string
-        stock:
-          type: integer
-        is_active:
-          type: boolean
-    ImageOut:
-      type: object
-      required:
-      - id
-      - product_id
-      - image_url
-      - sort_order
-      properties:
-        id:
-          type: integer
-        product_id:
-          type: integer
-        image_url:
-          type: string
-          example: /media/products/1/3c9e1f0a.jpg
-        color:
-          type:
-          - string
-          - 'null'
-        sort_order:
-          type: integer
-        content_type:
-          type:
-          - string
-          - 'null'
-          enum:
-          - image/jpeg
-          - image/png
-          - image/webp
-          - null
-        size_bytes:
-          type:
-          - integer
-          - 'null'
-    ImagePatch:
-      type: object
-      minProperties: 1
-      properties:
-        color:
-          type:
-          - string
-          - 'null'
-          maxLength: 40
-        sort_order:
-          type: integer
-          minimum: 0
-          maximum: 100
-    AdminProductOut:
-      type: object
-      required:
-      - id
-      - category
-      - name
-      - gender
-      - price
-      - is_active
-      - created_at
-      - updated_at
-      - variants
-      - images
-      properties:
-        id:
-          type: integer
-        category:
-          $ref: '#/components/schemas/CategoryOut'
-        name:
-          type: string
-        description:
-          type:
-          - string
-          - 'null'
-        gender:
-          type: string
-          enum:
-          - men
-          - women
-          - unisex
-        price:
-          $ref: '#/components/schemas/Money'
-        is_active:
-          type: boolean
-        created_at:
-          type: string
-          format: date-time
-        updated_at:
-          type: string
-          format: date-time
-        variants:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminVariantOut'
-        images:
-          type: array
-          items:
-            $ref: '#/components/schemas/ImageOut'
-    AdminProductList:
-      type: object
-      required:
-      - items
-      - total
-      - limit
-      - offset
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/AdminProductOut'
-        total:
-          type: integer
-        limit:
-          type: integer
-        offset:
-          type: integer
-    StockAdjustmentIn:
-      type: object
-      required:
-      - delta
-      - comment
-      properties:
-        delta:
-          type: integer
-          minimum: -10000
-          maximum: 10000
-          not:
-            const: 0
-          description: Положительное — приход, отрицательное — списание
-        comment:
-          type: string
-          minLength: 1
-          maxLength: 300
-    StockMovementOut:
-      type: object
-      required:
-      - id
-      - variant_id
-      - delta
-      - reason
-      - created_at
-      properties:
-        id:
-          type: integer
-        variant_id:
-          type: integer
-        delta:
-          type: integer
-        reason:
-          type: string
-          enum:
-          - reserve
-          - release
-          - adjust
-          - initial
-        order_id:
-          type:
-          - integer
-          - 'null'
-        changed_by:
-          oneOf:
-          - $ref: '#/components/schemas/CustomerShort'
-          - type: 'null'
-        comment:
-          type:
-          - string
-          - 'null'
-        stock_after:
-          type:
-          - integer
-          - 'null'
-          description: Остаток после изменения. Заполняется в ответе на корректировку
-        created_at:
-          type: string
-          format: date-time
-    StockMovementList:
-      type: object
-      required:
-      - items
-      - total
-      - limit
-      - offset
-      properties:
-        items:
-          type: array
-          items:
-            $ref: '#/components/schemas/StockMovementOut'
-        total:
-          type: integer
-        limit:
-          type: integer
-        offset:
-          type: integer
   securitySchemes:
     HTTPBearer:
       type: http
+      description: Токен из /api/auth/login
       scheme: bearer
-      bearerFormat: JWT
-  parameters:
-    ItemId:
-      name: item_id
-      in: path
-      required: true
-      schema:
-        type: integer
-        minimum: 1
-      description: id позиции корзины из GET /api/cart
-    OrderId:
-      name: order_id
-      in: path
-      required: true
-      schema:
-        type: integer
-        minimum: 1
-    VariantId:
-      name: variant_id
-      in: path
-      required: true
-      schema:
-        type: integer
-        minimum: 1
-    IdempotencyKey:
-      name: Idempotency-Key
-      in: header
-      required: false
-      description: UUID, который клиент генерирует один раз на действие (нажатие кнопки). Повтор с тем же ключом не создаёт
-        дубль.
-      schema:
-        type: string
-        format: uuid
-      example: 6f1c2b7e-3d4a-4b8e-9f0a-1c2d3e4f5a6b
-    IdempotencyKeyRequired:
-      name: Idempotency-Key
-      in: header
-      required: true
-      description: UUID, который клиент генерирует один раз на нажатие «Оплатить». Без ключа — 422.
-      schema:
-        type: string
-        format: uuid
-      example: 0d5e3c4b-2a1f-4e6d-8c7b-9a0f1e2d3c4b
-    StatusFilter:
-      name: status
-      in: query
-      schema:
-        $ref: '#/components/schemas/OrderStatus'
-    Limit:
-      name: limit
-      in: query
-      schema:
-        type: integer
-        minimum: 1
-        maximum: 100
-        default: 20
-    Offset:
-      name: offset
-      in: query
-      schema:
-        type: integer
-        minimum: 0
-        default: 0
-  responses:
-    Unauthorized:
-      description: Нет токена, токен недействителен или истёк
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorOut'
-          example:
-            detail: Требуется вход
-    Forbidden:
-      description: Метод только для администратора (FR-16, NFR-04)
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorOut'
-          example:
-            detail: Недостаточно прав
-    NotFound:
-      description: Не найдено или принадлежит другому пользователю
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorOut'
-          example:
-            detail: Не найдено
-    Conflict:
-      description: Действие противоречит текущему состоянию данных
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorOut'
-          example:
-            detail: 'Недостаточно товара: в наличии 2 шт.'
-    Unprocessable:
-      description: Ошибка в параметрах или теле запроса (формат FastAPI)
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/HTTPValidationError'
 tags:
 - name: service
-  description: Состояние сервера
+  description: Состояние API и сервера
 - name: catalog
   description: Каталог, FR-03…FR-06
 - name: auth

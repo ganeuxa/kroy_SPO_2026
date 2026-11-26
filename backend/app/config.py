@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     db_user: str = "kroy_app"
     db_password: str
 
+    # Версия релиза отображается в OpenAPI и /api/health.
+    app_version: str = "0.4.0"
     log_level: str = "INFO"
 
     # Ключ подписи JWT. Задаётся в .env, без него сервер не стартует.
