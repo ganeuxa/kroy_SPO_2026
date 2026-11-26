@@ -102,8 +102,8 @@ jobs:
           git cat-file -e "$baseline_ref:backend/app/routers/products.py"
           git show "$baseline_ref:backend/app/routers/products.py" > /tmp/products-before.py
           docker exec -i --user kroy "$backend" sh -c 'cat > /tmp/products-before.py' < /tmp/products-before.py
-          docker exec --user kroy -e BENCH_PRODUCTS_FILE=/tmp/products-before.py "$backend" python /tmp/benchmark_catalog.py before > qa-results/catalog-before.json
-          docker exec --user kroy "$backend" python /tmp/benchmark_catalog.py after > qa-results/catalog-after.json
+          docker exec --user kroy -e PYTHONPATH=/app -e BENCH_PRODUCTS_FILE=/tmp/products-before.py "$backend" python /tmp/benchmark_catalog.py before > qa-results/catalog-before.json
+          docker exec --user kroy -e PYTHONPATH=/app "$backend" python /tmp/benchmark_catalog.py after > qa-results/catalog-after.json
           python ops/compare-benchmark.py qa-results/catalog-before.json qa-results/catalog-after.json --output-dir qa-results
 
       - name: Drill controlled backend outage and recovery
