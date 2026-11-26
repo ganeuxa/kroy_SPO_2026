@@ -1,0 +1,4 @@
+PASS: guest and customer permissions, empty states, catalog and cart recovery
+PASS: browser purchase #104
+PASS: browser admin filters and status update, width 390 px
+{"paidId":104,"cancelledId":105,"stockBefore":8,"stockAfterCancellation":8,"viewportWidths":[360,390,768],"pageErrors":[]}

@@ -1,0 +1,9 @@
+test_cancel_while_notification_waits_keeps_cancelled (__main__.PaymentConcurrency.test_cancel_while_notification_waits_keeps_cancelled) ... ok
+test_concurrent_failure_then_success_is_idempotent (__main__.PaymentConcurrency.test_concurrent_failure_then_success_is_idempotent) ... ok
+test_concurrent_success_then_failure_is_idempotent (__main__.PaymentConcurrency.test_concurrent_success_then_failure_is_idempotent) ... ok
+test_expiry_releases_stock_once_and_cancels_payment (__main__.PaymentConcurrency.test_expiry_releases_stock_once_and_cancels_payment) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 1.806s
+
+OK
