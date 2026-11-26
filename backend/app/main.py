@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Крой API",
-    version="0.4.0",
+    version=settings.app_version,
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
     lifespan=lifespan,

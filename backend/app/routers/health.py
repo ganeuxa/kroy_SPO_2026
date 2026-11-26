@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
+from app.config import settings
 from app.db import get_db
 
 router = APIRouter(tags=["service"])
@@ -16,6 +17,7 @@ log = logging.getLogger("kroy.health")
 class HealthOut(BaseModel):
     status: str
     db: str
+    version: str
 
 
 @router.get("/health", response_model=HealthOut, responses={503: {"model": HealthOut}})
@@ -25,5 +27,8 @@ def health(db: Session = Depends(get_db)):
         db.execute(text("SELECT 1"))
     except SQLAlchemyError:
         log.warning("health: база данных недоступна")
-        return JSONResponse(status_code=503, content={"status": "error", "db": "unavailable"})
-    return {"status": "ok", "db": "ok"}
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "db": "unavailable", "version": settings.app_version},
+        )
+    return {"status": "ok", "db": "ok", "version": settings.app_version}

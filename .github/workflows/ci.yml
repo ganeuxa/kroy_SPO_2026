@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: "Intentionally fail after the checks (for the failure demonstration)"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-test.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-test.txt
+
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Create ephemeral QA configuration
+        run: |
+          cat > .env.qa <<'EOF'
+          POSTGRES_DB=kroy
+          POSTGRES_USER=kroy_owner
+          POSTGRES_PASSWORD=ci-owner-only
+          DB_PASSWORD=ci-app-only
+          JWT_SECRET=ci-ephemeral-signing-key-not-for-deployment
+          MINIO_ACCESS_KEY=ci-storage-user
+          MINIO_SECRET_KEY=ci-ephemeral-storage-key
+          MINIO_BUCKET=kroy-products
+          APP_VERSION=0.4.0
+          TEST_HTTP_PORT=18080
+          TEST_BIND_ADDR=127.0.0.1
+          LOG_LEVEL=INFO
+          ORDER_PAYMENT_TTL_MINUTES=15
+          PAYMENT_PROVIDER=test
+          EOF
+
+      - name: Start isolated production-like stack
+        run: docker compose -f docker-compose.test.yml --env-file .env.qa -p kroy-varvara-nginx-qa up -d --build
+
+      - name: Wait for API health
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:18080/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose -f docker-compose.test.yml --env-file .env.qa -p kroy-varvara-nginx-qa ps
+          docker compose -f docker-compose.test.yml --env-file .env.qa -p kroy-varvara-nginx-qa logs
+          exit 1
+
+      - name: Run integration and release checks
+        env:
+          QA_NGINX: "1"
+        run: |
+          mkdir -p qa-results
+          python -m pytest -v --junitxml=qa-results/pytest.xml
+
+      - name: Measure catalog before and after optimization
+        run: |
+          set -euo pipefail
+          project=kroy-varvara-nginx-qa
+          backend=$(docker compose -f docker-compose.test.yml --env-file .env.qa -p "$project" ps -q backend)
+          docker cp tests/benchmark_catalog.py "$backend:/tmp/benchmark_catalog.py"
+
+          # Commit immediately before backend PR #13 introduced the catalog query optimization.
+          baseline_ref=902edb3
+          git cat-file -e "$baseline_ref:backend/app/routers/products.py"
+          git show "$baseline_ref:backend/app/routers/products.py" > /tmp/products-before.py
+          docker cp /tmp/products-before.py "$backend:/tmp/products-before.py"
+          docker exec --user kroy -e BENCH_PRODUCTS_FILE=/tmp/products-before.py "$backend" python /tmp/benchmark_catalog.py before > qa-results/catalog-before.json
+          docker exec --user kroy "$backend" python /tmp/benchmark_catalog.py after > qa-results/catalog-after.json
+          python ops/compare-benchmark.py qa-results/catalog-before.json qa-results/catalog-after.json --output-dir qa-results
+
+      - name: Drill controlled backend outage and recovery
+        run: |
+          set -euo pipefail
+          project=kroy-varvara-nginx-qa
+          compose=(docker compose -f docker-compose.test.yml --env-file .env.qa -p "$project")
+          "${compose[@]}" stop backend
+
+          set +e
+          python ops/monitor.py --url http://127.0.0.1:18080 --count 1 --interval 0 --timeout 3 --output qa-results/outage-monitor.jsonl > qa-results/outage-monitor.stdout.jsonl
+          monitor_status=$?
+          set -e
+          test "$monitor_status" -eq 1
+
+          curl --silent --show-error --dump-header qa-results/outage-headers.txt --output qa-results/outage-body.json --write-out '%{http_code}\n' http://127.0.0.1:18080/api/health > qa-results/outage-status.txt
+          test "$(cat qa-results/outage-status.txt)" = 503
+          "${compose[@]}" logs --no-color --tail=100 nginx > qa-results/outage-nginx.log
+
+          "${compose[@]}" start backend
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:18080/api/health > qa-results/recovery-health.json; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(python -c 'import json; print(json.load(open("qa-results/recovery-health.json"))["status"])')" = ok
+          python ops/monitor.py --url http://127.0.0.1:18080 --count 1 --interval 0 --timeout 3 --output qa-results/recovery-monitor.jsonl > qa-results/recovery-monitor.stdout.jsonl
+          "${compose[@]}" logs --no-color --tail=200 backend nginx > qa-results/recovery-services.log
+
+      - name: Simulate a failed CI run when requested
+        if: ${{ inputs.simulate_failure == true }}
+        run: |
+          echo "Intentional failure requested for the CI demonstration."
+          exit 1
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-evidence
+          path: qa-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Show service logs after a failure
+        if: failure()
+        run: docker compose -f docker-compose.test.yml --env-file .env.qa -p kroy-varvara-nginx-qa logs --no-color
+
+      - name: Stop isolated stack
+        if: always()
+        run: docker compose -f docker-compose.test.yml --env-file .env.qa -p kroy-varvara-nginx-qa down -v

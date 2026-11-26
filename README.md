@@ -2,10 +2,9 @@
 
 Учебный проект по дисциплине «Создание программного обеспечения», РТУ МИРЭА, группа ЭФБО-07-24.
 
-Сейчас это каркас этапа II (практическая работа №5): сервер, БД и интерфейс каталога.
-Готово: просмотр каталога, фильтры, поиск, карточка товара (FR-03…FR-06),
-регистрация, вход и добавление в корзину (FR-01, FR-02, FR-07).
-Есть тестовое окружение: Nginx, собранный фронт, healthcheck и автоперезапуск (№7–8).
+Текущая плановая версия учебного релиза — `v0.4.0` (тег и развёртывание требуется подтвердить перед защитой).
+Проект включает каталог, регистрацию и вход, корзину, заказы и оплату, административные операции,
+хранилище фотографий, SQL-миграции и production-like Compose окружение.
 
 ## Стек
 
@@ -116,33 +115,51 @@ docker compose exec db psql -U kroy_owner -d kroy
 
 ## Тестовое окружение (№7–8)
 
-Отдельный compose-файл, который запускает приложение так, как оно будет работать на стенде:
-фронт собран в статику и отдаётся Nginx, запросы `/api/` Nginx передаёт в FastAPI.
-Окружение разработки при этом не затрагивается: другое имя проекта (`kroy-test`) и свой том БД.
+Отдельный compose-файл запускает frontend за Nginx, FastAPI, PostgreSQL, SeaweedFS и одноразовый раннер миграций.
+Окружение разработки при этом не затрагивается: отдельные тома и QA-проект.
 
 ```
-браузер ──► :8080 Nginx ──(сеть front)──► backend:8000 ──(сеть back, internal)──► db:5432
-            статика React                 FastAPI                                PostgreSQL
+браузер ──► :8080 Nginx ──(front)──► backend:8000 ──(back, internal)──► db:5432
+            статика React       │       │                                PostgreSQL
+                                │       └──────────────────────────────► storage:8333
+                                └── /media ────────────────────────────► storage:8333
+                      migrate ─────────────────────────────────────────► db:5432
 ```
 
 | | Разработка (`docker-compose.yml`) | Тест (`docker-compose.test.yml`) |
 |---|---|---|
 | Фронт | Vite dev server, горячая перезагрузка | `npm run build`, раздаёт Nginx |
 | Backend | `--reload`, исходники смонтированы | код внутри образа, без `--reload` |
+| Сервисы | БД, migrate, storage, backend, frontend | БД, migrate, storage, backend, Nginx |
 | Порты наружу | 5173, 8000, 5432 (на 127.0.0.1) | только 8080 (Nginx) |
-| Healthcheck | только БД | БД, backend, Nginx |
-| Перезапуск | `unless-stopped` у БД и backend | `unless-stopped` у всех |
+| Healthcheck | БД и storage | БД, storage, backend, Nginx; migrate завершается с кодом 0 |
+| Перезапуск | `unless-stopped` у БД, storage и backend | `unless-stopped` у долгоживущих сервисов |
 | Права | | backend и Nginx не от root, ФС только для чтения, `cap_drop: ALL` |
 
 Запуск (нужен тот же `.env`, что и для разработки):
 
 ```bash
 docker compose -f docker-compose.test.yml up -d --build
-docker compose -f docker-compose.test.yml ps          # все три сервиса (healthy)
+docker compose -f docker-compose.test.yml ps          # db, storage, backend и nginx healthy; migrate exited (0)
 ```
 
 Открыть http://localhost:8080. Swagger: http://localhost:8080/api/docs.
 Порт меняется переменной `TEST_HTTP_PORT` в `.env`.
+
+### Проверка доступности и времени ответа
+
+`/healthz` проверяет Nginx, `/api/health` — API и БД и возвращает версию `APP_VERSION`; оба ответа должны быть HTTP 200.
+Backend пишет статус и длительность каждого запроса в лог, не записывая тело запроса или заголовки.
+Для серии проверок из PowerShell или терминала:
+
+```bash
+python ops/monitor.py --url http://127.0.0.1:8080 --count 5 --interval 10 --output qa-results/healthcheck.jsonl
+```
+
+Скрипт пишет результат каждой проверки и сводку с доступностью, числом ошибок, средней задержкой и p95.
+Для изолированного QA замените порт на `18080`. Не запускайте проверки на стенде, который в этот момент обновляется.
+
+Сравнение оптимизации каталога выполняется в GitHub Actions на одинаковой QA-базе. Workflow сохраняет JSON до/после, таблицу и SVG-график в артефакте `ci-evidence`. Полученные значения относятся к конкретному runner и commit; их нужно просмотреть вместе с Варей.
 
 Полезные команды:
 
@@ -158,11 +175,11 @@ docker compose -f docker-compose.test.yml down -v                 # остано
 
 ### Результат проверки тестового окружения (№7–8)
 
-Проверено 25.10.2026 на Windows 11, Docker Desktop 4.96.3 (Engine 29.9.2), Макеенков М.:
+Проверено 25.10.2026 на Windows 11, Docker Desktop 4.96.3 (Engine 29.9.2), Макеенков М. Это smoke/отказной прогон прежнего коммита; он не подтверждает изменения backend PR #13 или кандидата `v0.4.0`.
 
 | Проверка | Ожидание | Результат |
 |---|---|---|
-| `up -d --build` на чистой машине по README | Три сервиса `healthy` | ✔ db, backend, nginx healthy менее чем за 30 с |
+| `up -d --build` на чистой машине по старому README | Три долгоживущих сервиса `healthy` | ✔ db, backend, nginx менее чем за 30 с (старый состав compose) |
 | `GET /healthz`, `/api/health` через Nginx | 200 | ✔ |
 | Вход anna@example.com, `/api/auth/me`, `POST /api/cart` через Nginx | 200, корзина с суммой | ✔ |
 | Неверный пароль | 401 | ✔ |
@@ -181,17 +198,22 @@ docker compose -f docker-compose.test.yml down -v                 # остано
 
 Проект изменений БД, REST API (OpenAPI) и эксплуатации для этапа III: [docs/stage3](docs/stage3/README.md).
 
+## Этапы IV–VI: архитектура и эксплуатация
+
+Сверка задач Матвея, схемы, решение по архитектуре, CI, инструкции запуска/отката и чек-лист отказа: [docs/stage4-6/matvey-architecture-operations.md](docs/stage4-6/matvey-architecture-operations.md).
+
 ## API
 
 | Метод | Путь | Назначение | Коды |
 |---|---|---|---|
-| GET | `/api/health` | Сервер жив и БД доступна | 200, 503 |
+| GET | `/api/health` | Состояние API/БД и версия релиза | 200, 503 |
 | GET | `/api/products` | Каталог с фильтрами и поиском | 200, 422, 503 |
 | GET | `/api/products/{id}` | Карточка товара с вариантами | 200, 404, 422, 503 |
 | GET | `/api/filters` | Категории, размеры, цвета, диапазон цен для фильтров | 200, 503 |
 | POST | `/api/auth/register` | Регистрация, сразу возвращает токен | 201, 409, 422 |
 | POST | `/api/auth/login` | Вход по email и паролю | 200, 401, 403, 422 |
 | GET | `/api/auth/me` | Текущий пользователь по токену | 200, 401 |
+| POST | `/api/auth/logout` | Отозвать все действующие токены пользователя | 204, 401 |
 | GET | `/api/cart` | Корзина текущего пользователя | 200, 401 |
 | POST | `/api/cart` | Добавить вариант товара в корзину | 200, 401, 404, 409, 422 |
 | PATCH | `/api/cart/items/{id}` | Изменить количество позиции | 200, 401, 404, 409, 422 |
@@ -207,7 +229,9 @@ docker compose -f docker-compose.test.yml down -v                 # остано
 | | `/api/admin/...` | Админка: товары, варианты, остатки, фото, заказы | 401 без токена, 403 не админ |
 
 Полное описание новых методов этапа III: [docs/stage3/api-design.md](docs/stage3/api-design.md),
-в Swagger сервера — разделы orders, payments, admin.
+в Swagger сервера — разделы orders, payments, admin. Снимок полного актуального runtime-контракта
+лежит в [docs/stage3/api/openapi.yaml](docs/stage3/api/openapi.yaml); параметры, ответы и схемы
+собираются из FastAPI, а русские пояснения и примеры запросов — из `stage3-paths.yaml`.
 
 ### Заказы и оплата
 
@@ -220,6 +244,11 @@ docker compose -f docker-compose.test.yml down -v                 # остано
   с `{"result": "succeeded"}` или `{"result": "failed", "failure_reason": "..."}`.
 - Повтор запроса с тем же `Idempotency-Key` не создаёт второй заказ или платёж, а возвращает
   уже созданный с кодом 200.
+- Повторное уведомление платёжного сервиса возвращает сохранённый итог платежа и не применяет
+  оплату/отказ повторно. Для каждого платежа первый терминальный результат является окончательным;
+  неверный статус заказа даёт 409.
+- `POST /api/auth/logout` отзывает все ранее выданные токены пользователя. Вышедший пользователь
+  должен войти снова; повышение/снятие роли проверяется по текущей записи в БД.
 
 ```bash
 curl -X POST http://localhost:8000/api/orders -H "Authorization: Bearer <токен>" \
