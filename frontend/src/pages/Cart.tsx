@@ -38,15 +38,15 @@ export default function Cart() {
         <span className="card__meta">{item.color}, размер {item.size}</span>
         <span className="card__meta">{formatPrice(item.price)} за шт. · В наличии {item.stock}</span>
         <div className="quantity" aria-label={`Количество ${item.name}`}>
-          <button type="button" disabled={busy !== null || item.quantity <= 1} onClick={() => change(item.id, item.quantity - 1)} aria-label="Уменьшить количество">−</button>
+          <button type="button" disabled={busy !== null || item.quantity <= 1 || item.stock === 0} onClick={() => change(item.id, Math.min(item.quantity - 1, item.stock))} aria-label="Уменьшить количество">−</button>
           <span>{item.quantity}</span>
           <button type="button" disabled={busy !== null || item.quantity >= Math.min(99, item.stock)} onClick={() => change(item.id, item.quantity + 1)} aria-label="Увеличить количество">+</button>
           <button type="button" className="link-button" disabled={busy !== null} onClick={() => change(item.id)}>Удалить</button>
         </div>
-        {item.quantity > item.stock && <span className="status--error">В наличии только {item.stock} шт.</span>}
+        {item.quantity > item.stock && <span className="status--error">{item.stock === 0 ? "Товар закончился. Удалите его из корзины." : `В наличии только ${item.stock} шт.`}</span>}
       </div>
       <span className="card__price">{formatPrice(item.line_total)}</span>
     </li>)}</ul>
-    <div className="cart__summary"><span>Товаров: {cart.total_quantity}</span><span className="cart__total">Итого: {formatPrice(cart.total)}</span><Link to="/checkout" className="primary">Оформить заказ</Link></div>
+    <div className="cart__summary"><span>Товаров: {cart.total_quantity}</span><span className="cart__total">Итого: {formatPrice(cart.total)}</span>{cart.items.some((item) => item.quantity > item.stock) ? <span className="status--error" role="alert">Чтобы оформить заказ, исправьте количество отмеченных товаров или удалите их.</span> : <Link to="/checkout" className="primary">Оформить заказ</Link>}</div>
   </section>;
 }

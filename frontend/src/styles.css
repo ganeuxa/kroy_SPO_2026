@@ -349,3 +349,19 @@ button, input, select { font: 14px "Comic Sans MS", "Comic Sans", cursive; color
 .variant-panel{margin-bottom:10px}.history-list{max-height:180px;overflow:auto;border-top:1px solid #bbb}.history-list p{margin:7px 0}.image-row{display:grid;grid-template-columns:100px 1fr;gap:15px}.image-row>img{width:100px;height:100px;object-fit:cover}.inline-check{display:flex!important;flex-direction:row!important;align-items:center}.inline-check input{width:auto!important}.payment-page{max-width:640px}.payment-page .actions button{min-width:120px}
 @media(max-width:760px){.flow-layout{grid-template-columns:1fr}.flow-page{padding:6px}.flow-panel{padding:12px}.order-card{align-items:flex-start;flex-wrap:wrap}.toolbar label{min-width:calc(50% - 10px)}.cart__item{align-items:start}}
 @media(max-width:420px){.toolbar label{min-width:100%}.flow-row{font-size:13px}.image-row{grid-template-columns:70px 1fr}.image-row>img{width:70px;height:70px}}
+
+/* Основной путь покупки должен помещаться на телефоне без горизонтальной прокрутки. */
+@media(max-width:600px){
+  .page{width:100%;padding:8px;min-width:0}
+  .navbar__links{width:100%;margin-left:0}
+  .hero__lead{overflow-wrap:anywhere}
+  .window,.window__body,.catalog,.results{min-width:0}
+  .window__body{padding:10px 8px}
+  .filters{align-items:stretch}
+  .filters>label,.filters>fieldset,.filters__search{width:100%;min-width:0}
+  .filters__search input{flex:1;min-width:0}
+  .filters select{width:100%}
+  .results__bar{flex-wrap:wrap;gap:8px}
+  .webring{flex-wrap:wrap}
+}
+@media(max-width:420px){.grid{grid-template-columns:1fr}}

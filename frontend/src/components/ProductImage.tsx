@@ -1,6 +1,6 @@
-// Фото хранятся в MinIO, а он подключается на этапе III.
-// Пока вместо фото — вещь, разложенная на чёрном (как флэтлей у архивных магазинов):
-// силуэт по названию товара, ткань с потёртой фактурой, цвет выбирается от названия.
+import { useState } from "react";
+
+// Силуэт заменяет фото, пока у товара нет доступного изображения.
 
 type Kind = "tshirt" | "hoodie" | "jeans" | "jacket" | "unknown";
 
@@ -40,7 +40,10 @@ const DETAILS: Partial<Record<Kind, string>> = {
 };
 
 export default function ProductImage({ name, imageUrl }: { name: string; imageKey?: string | null; imageUrl?: string | null }) {
-  if (imageUrl) return <div className="shot"><img src={imageUrl} alt={name} loading="lazy" /></div>;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (imageUrl && imageUrl !== failedUrl) {
+    return <div className="shot"><img src={imageUrl} alt={name} loading="lazy" onError={() => setFailedUrl(imageUrl)} /></div>;
+  }
   const h = hash(name);
   const kind = kindOf(name);
   const cloth = CLOTH[h % CLOTH.length];
