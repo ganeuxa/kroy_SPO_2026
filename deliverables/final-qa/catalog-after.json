@@ -1,0 +1,39 @@
+{
+  "phase": "after",
+  "fixture": {
+    "products": 1000,
+    "variants_per_product": 40,
+    "images_per_product": 5
+  },
+  "method": "route + database + serialization; 5 warmups, 50 measured",
+  "cases": {
+    "24": {
+      "median_ms": 4.299,
+      "p95_ms": 4.912,
+      "min_ms": 4.209,
+      "sql_queries": [
+        2
+      ],
+      "payload_sha256": [
+        "42d39bfd8bdec3f2602edf5ae1f340d9e9483b0782ef163d71e2ca2e8b23621e"
+      ],
+      "response_bytes": 5302,
+      "total": 1000,
+      "repetitions": 50
+    },
+    "100": {
+      "median_ms": 4.93,
+      "p95_ms": 5.578,
+      "min_ms": 4.729,
+      "sql_queries": [
+        2
+      ],
+      "payload_sha256": [
+        "0a375eea5f0810628a1a419515ef6e6add02a31704c6c4b13e04e840f8fe4451"
+      ],
+      "response_bytes": 21947,
+      "total": 1000,
+      "repetitions": 50
+    }
+  }
+}

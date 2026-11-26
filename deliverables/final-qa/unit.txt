@@ -1,0 +1,11 @@
+test_bcrypt_long_suffix_rejected (__main__.ValidationTests.test_bcrypt_long_suffix_rejected) ... ok
+test_courier_requires_address (__main__.ValidationTests.test_courier_requires_address) ... ok
+test_password_salted_and_verifiable (__main__.ValidationTests.test_password_salted_and_verifiable) ... ok
+test_pickup_rejects_address (__main__.ValidationTests.test_pickup_rejects_address) ... ok
+test_registration_blank_name (__main__.ValidationTests.test_registration_blank_name) ... ok
+test_stock_zero_rejected (__main__.ValidationTests.test_stock_zero_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 1.026s
+
+OK
