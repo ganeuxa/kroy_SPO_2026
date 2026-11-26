@@ -47,6 +47,6 @@ export default function Cart() {
       </div>
       <span className="card__price">{formatPrice(item.line_total)}</span>
     </li>)}</ul>
-    <div className="cart__summary"><span>Товаров: {cart.total_quantity}</span><span className="cart__total">Итого: {formatPrice(cart.total)}</span><Link to="/checkout" className="primary">Оформить заказ</Link></div>
+    <div className="cart__summary"><span>Товаров: {cart.total_quantity}</span><span className="cart__total">Итого: {formatPrice(cart.total)}</span>{cart.items.some((item) => item.quantity > item.stock) ? <span className="status--error" role="alert">Уменьшите количество товаров до доступного остатка.</span> : <Link to="/checkout" className="primary">Оформить заказ</Link>}</div>
   </section>;
 }

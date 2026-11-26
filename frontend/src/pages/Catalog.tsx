@@ -23,6 +23,7 @@ export default function Catalog() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState(params.get("q") ?? "");
+  const [retry, setRetry] = useState(0);
 
   const page = Math.max(1, Number(params.get("page") ?? 1) || 1);
 
@@ -43,7 +44,7 @@ export default function Catalog() {
       .then(setData)
       .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Не удалось загрузить каталог"))
       .finally(() => setLoading(false));
-  }, [params, page]);
+  }, [params, page, retry]);
 
   function update(key: string, value: string) {
     const next = new URLSearchParams(params);
@@ -71,6 +72,7 @@ export default function Catalog() {
         <form onSubmit={onSearch} className="filters__search">
           <input
             type="search"
+            aria-label="Поиск товара"
             placeholder="Поиск по названию"
             value={search}
             maxLength={100}
@@ -154,7 +156,7 @@ export default function Catalog() {
 
       <section className="results">
         <div className="results__bar">
-          <span>{data ? `Найдено: ${data.total}` : " "}</span>
+          <span>{data ? `${params.get("q") ? `По запросу «${params.get("q")}» · ` : ""}Найдено: ${data.total}` : " "}</span>
           <select value={params.get("sort") ?? "new"} onChange={(e) => update("sort", e.target.value)}>
             <option value="new">Сначала новые</option>
             <option value="price_asc">Сначала дешевле</option>
@@ -163,7 +165,7 @@ export default function Catalog() {
         </div>
 
         {loading && <p className="status">Загрузка…</p>}
-        {error && <p className="status status--error">{error}</p>}
+        {error && <div className="status status--error" role="alert">{error} <button type="button" onClick={() => setRetry((n) => n + 1)}>Повторить загрузку</button></div>}
         {!loading && !error && data?.items.length === 0 && (
           <p className="status">
             Ничего не найдено.{" "}
